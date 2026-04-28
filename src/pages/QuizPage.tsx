@@ -5,6 +5,13 @@ import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
 
+type Page = "main" | "quiz";
+
+type QuizPageProps = {
+  page: Page;
+  onNavigate: (page: Page) => void;
+};
+
 interface QuizCountry {
   name: string;
   isoAlpha2: string;
@@ -42,7 +49,7 @@ function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function QuizPage() {
+export function QuizPage({ page, onNavigate }: QuizPageProps) {
   const countries = useMemo(() => {
     const parsed = JSON.parse(countriesGeoJsonRaw) as { features?: CountryFeature[] };
     return parsed.features ?? [];
@@ -139,100 +146,112 @@ export function QuizPage() {
   const focusCountry = shouldFocusAnswer ? current?.feature : undefined;
 
   return (
-    <div className="quiz-page">
-      {!current && quizCountries.length === 0 ? (
-        <div className="quiz-start">
-          <p className="quiz-description">
-            No quiz countries are currently available.
-          </p>
-        </div>
-      ) : !current ? (
-        <div className="quiz-start">
-          <p className="quiz-description">Preparing quiz...</p>
-        </div>
-      ) : (
-        <div className="quiz-layout">
-          {/* Flag pane */}
-          <div className="quiz-flag-pane">
-            <CountryFlag code={current.isoAlpha2} className="quiz-flag" />
+    <main className="globe-page">
+      <section className="globe-wrap globe-wrap-full">
+        <InteractiveGlobe
+          countries={countries}
+          globeImageUrl={globeImageUrl}
+          highlightOnHover={result === null}
+          pinnedCountryIsoA2={pinnedIso}
+          clearSelectionSignal={quizRound}
+          focusLatLng={focusLatLng}
+          focusCountry={focusCountry}
+          onPointClick={result === null ? handleGlobeClick : undefined}
+        />
 
-            {result === null && (
+        <aside className="overlay-modal" role="region" aria-label="Quiz controls">
+          <nav className="overlay-nav" aria-label="Mode selector">
+            <button
+              className={`nav-btn${page === "main" ? " active" : ""}`}
+              aria-current={page === "main" ? "page" : undefined}
+              onClick={() => onNavigate("main")}
+            >
+              Explore
+            </button>
+            <button
+              className={`nav-btn${page === "quiz" ? " active" : ""}`}
+              aria-current={page === "quiz" ? "page" : undefined}
+              onClick={() => onNavigate("quiz")}
+            >
+              Quiz
+            </button>
+          </nav>
+
+          <div className="overlay-body quiz-overlay-body">
+            {!current && quizCountries.length === 0 ? (
+              <p className="quiz-description">No quiz countries are currently available.</p>
+            ) : !current ? (
+              <p className="quiz-description">Preparing quiz...</p>
+            ) : (
               <>
-                <p className="quiz-prompt">
-                  {selected ? (
-                    <>Selected: <strong>{selected.label}</strong></>
-                  ) : (
-                    "Click a country on the globe"
-                  )}
-                </p>
-                <div className="quiz-actions">
-                  <button
-                    className="quiz-btn primary"
-                    onClick={handleSubmit}
-                    disabled={!selected}
-                  >
-                    Submit
-                  </button>
-                  <button className="quiz-btn" onClick={handleSkip}>
-                    Skip
-                  </button>
-                  <button className="quiz-btn" onClick={handleShowAnswer}>
-                    Show Answer
-                  </button>
-                </div>
+                <CountryFlag code={current.isoAlpha2} className="quiz-flag" />
+
+                {result === null && (
+                  <>
+                    <p className="quiz-prompt">
+                      {selected ? (
+                        <>
+                          Selected: <strong>{selected.label}</strong>
+                        </>
+                      ) : (
+                        "Click a country on the globe"
+                      )}
+                    </p>
+                    <div className="quiz-actions">
+                      <button
+                        className="quiz-btn primary"
+                        onClick={handleSubmit}
+                        disabled={!selected}
+                      >
+                        Submit
+                      </button>
+                      <button className="quiz-btn" onClick={handleSkip}>
+                        Skip
+                      </button>
+                      <button className="quiz-btn" onClick={handleShowAnswer}>
+                        Show Answer
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {result === "correct" && (
+                  <div className="quiz-result correct">
+                    <span>
+                      Correct! That&apos;s <strong>{current.name}</strong>.
+                    </span>
+                    <button className="quiz-btn" onClick={startQuiz}>
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {result === "incorrect" && (
+                  <div className="quiz-result incorrect">
+                    <span>
+                      Incorrect! The answer was <strong>{current.name}</strong>, highlighted on the globe.
+                    </span>
+                    <button className="quiz-btn" onClick={startQuiz}>
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                {result === "revealed" && (
+                  <div className="quiz-result revealed">
+                    <span>
+                      The answer is <strong>{current.name}</strong>, highlighted on the globe.
+                    </span>
+                    <button className="quiz-btn" onClick={startQuiz}>
+                      Next
+                    </button>
+                  </div>
+                )}
               </>
             )}
-
-            {result === "correct" && (
-              <div className="quiz-result correct">
-                <span>
-                  Correct! That&apos;s <strong>{current.name}</strong>.
-                </span>
-                <button className="quiz-btn" onClick={startQuiz}>
-                  Next
-                </button>
-              </div>
-            )}
-
-            {result === "incorrect" && (
-              <div className="quiz-result incorrect">
-                <span>
-                  Incorrect! The answer was <strong>{current.name}</strong>,
-                  highlighted on the globe.
-                </span>
-                <button className="quiz-btn" onClick={startQuiz}>
-                  Next
-                </button>
-              </div>
-            )}
-
-            {result === "revealed" && (
-              <div className="quiz-result revealed">
-                <span>
-                  The answer is <strong>{current.name}</strong>, highlighted on the globe.
-                </span>
-                <button className="quiz-btn" onClick={startQuiz}>
-                  Next
-                </button>
-              </div>
-            )}
           </div>
-
-          {/* Globe pane */}
-          <div className="globe-wrap">
-            <InteractiveGlobe
-              countries={countries}
-              globeImageUrl={globeImageUrl}
-              highlightOnHover={result === null}
-              pinnedCountryIsoA2={pinnedIso}
-              clearSelectionSignal={quizRound}
-              focusLatLng={focusLatLng}
-              focusCountry={focusCountry}
-              onPointClick={result === null ? handleGlobeClick : undefined}
-            />
-          </div>
-        </div>
-      )}
-    </div>
+        </aside>
+      </section>
+    </main>
   );
 }

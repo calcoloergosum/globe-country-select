@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Header } from "./components/Header";
 import { MainPage } from "./pages/MainPage";
 import { QuizPage } from "./pages/QuizPage";
 
@@ -72,8 +71,11 @@ function App() {
   return (
     <div className="app-shell">
       <StarField />
-      <Header page={page} onNavigate={setPage} />
-      {page === "main" ? <MainPage /> : <QuizPage />}
+      {page === "main" ? (
+        <MainPage page={page} onNavigate={setPage} />
+      ) : (
+        <QuizPage page={page} onNavigate={setPage} />
+      )}
     </div>
   );
 }
