@@ -61,6 +61,7 @@ export function QuizPage() {
   const [current, setCurrent] = useState<QuizCountry | null>(() =>
     quizCountries.length > 0 ? pickRandom(quizCountries) : null
   );
+  const [quizRound, setQuizRound] = useState(0);
   const [selected, setSelected] = useState<GlobeEventData | null>(null);
   const [result, setResult] = useState<"correct" | "incorrect" | "revealed" | null>(null);
 
@@ -76,9 +77,10 @@ export function QuizPage() {
     setCurrent(pickRandom(quizCountries));
     setSelected(null);
     setResult(null);
+    setQuizRound((round) => round + 1);
   };
 
-  const handleGlobeClick = (data: GlobeEventData) => {
+  const handleGlobeClick = (data: GlobeEventData | null) => {
     if (result !== null) return;
     setSelected(data);
   };
@@ -86,6 +88,7 @@ export function QuizPage() {
   const handleSubmit = () => {
     if (!current || !selected || result !== null) return;
     setResult(selected.isoAlpha2 === current.isoAlpha2 ? "correct" : "incorrect");
+    setSelected(null);
   };
 
   const handleSkip = () => {
@@ -96,6 +99,7 @@ export function QuizPage() {
   const handleShowAnswer = () => {
     if (!current || result !== null) return;
     setResult("revealed");
+    setSelected(null);
   };
 
   useEffect(() => {
@@ -221,6 +225,7 @@ export function QuizPage() {
               globeImageUrl={globeImageUrl}
               highlightOnHover={result === null}
               pinnedCountryIsoA2={pinnedIso}
+              clearSelectionSignal={quizRound}
               focusLatLng={focusLatLng}
               focusCountry={focusCountry}
               onPointClick={result === null ? handleGlobeClick : undefined}

@@ -14,10 +14,11 @@ type InteractiveGlobeProps = {
   bumpImageUrl?: string;
   highlightOnHover?: boolean;
   pinnedCountryIsoA2?: string;
+  clearSelectionSignal?: number;
   focusLatLng?: { lat: number; lng: number };
   focusCountry?: CountryFeature;
   onPointHover?: (point: GlobeEventData | null) => void;
-  onPointClick?: (point: GlobeEventData) => void;
+  onPointClick?: (point: GlobeEventData | null) => void;
 };
 
 type FocusTransitionPhase = "zoomOut" | "zoomIn";
@@ -39,6 +40,7 @@ export function InteractiveGlobe({
   bumpImageUrl,
   highlightOnHover = true,
   pinnedCountryIsoA2,
+  clearSelectionSignal,
   focusLatLng,
   focusCountry,
   onPointHover,
@@ -49,6 +51,7 @@ export function InteractiveGlobe({
   const onPointHoverRef = useRef(onPointHover);
   const onPointClickRef = useRef(onPointClick);
   const pinnedIsoRef = useRef(pinnedCountryIsoA2);
+  const selectedCountryRef = useRef<CountryFeature | null>(null);
   const highlightOnHoverRef = useRef(highlightOnHover);
   const applyStylesRef = useRef<(() => void) | null>(null);
   const focusTargetRef = useRef<{ lat: number; lng: number; zoomDistance?: number } | null>(null);
@@ -65,6 +68,11 @@ export function InteractiveGlobe({
     pinnedIsoRef.current = pinnedCountryIsoA2;
     applyStylesRef.current?.();
   }, [pinnedCountryIsoA2]);
+
+  useEffect(() => {
+    selectedCountryRef.current = null;
+    applyStylesRef.current?.();
+  }, [clearSelectionSignal]);
 
   useEffect(() => {
     highlightOnHoverRef.current = highlightOnHover;
@@ -207,7 +215,6 @@ export function InteractiveGlobe({
     const longitudeRotation = new THREE.Quaternion();
     const latitudeRotation = new THREE.Quaternion();
     const maxLatitudeRotation = THREE.MathUtils.degToRad(89.5);
-    let selectedCountry: CountryFeature | null = null;
     let hoveredCountry: CountryFeature | null = null;
     let rotationLatitude = 0;
     let rotationLongitude = 0;
@@ -228,7 +235,7 @@ export function InteractiveGlobe({
             return activePolygonAltitude;
           }
 
-          if (selectedCountry && feature === selectedCountry) {
+          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
             return activePolygonAltitude;
           }
 
@@ -244,7 +251,7 @@ export function InteractiveGlobe({
             return pinnedPolygonCapColor;
           }
 
-          if (selectedCountry && feature === selectedCountry) {
+          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
             return selectedPolygonCapColor;
           }
 
@@ -260,7 +267,7 @@ export function InteractiveGlobe({
             return pinnedPolygonSideColor;
           }
 
-          if (selectedCountry && feature === selectedCountry) {
+          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
             return selectedPolygonSideColor;
           }
 
@@ -276,7 +283,7 @@ export function InteractiveGlobe({
             return pinnedPolygonStrokeColor;
           }
 
-          if (selectedCountry && feature === selectedCountry) {
+          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
             return selectedPolygonStrokeColor;
           }
 
@@ -413,15 +420,19 @@ export function InteractiveGlobe({
 
       const country = pickCountryAtClientPoint(event.clientX, event.clientY);
       if (country) {
-        selectedCountry = country;
+        selectedCountryRef.current = country;
         applyPolygonStyles();
 
         if (onPointClickRef.current) {
           onPointClickRef.current(toEventData(country));
         }
       } else {
-        selectedCountry = null;
+        selectedCountryRef.current = null;
         applyPolygonStyles();
+
+        if (onPointClickRef.current) {
+          onPointClickRef.current(null);
+        }
       }
     };
 
