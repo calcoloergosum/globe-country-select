@@ -7,12 +7,9 @@ import type { CountryFeature, GlobeEventData } from "./globeTypes";
 import { OrbitControl } from "./OrbitControl";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
 import { createFocusTransitionController } from "./interactiveGlobe/focusTransition";
+import { createPinchGestureController } from "./interactiveGlobe/pinchZoom";
 import { createGlobePicker, toGlobeEventData } from "./interactiveGlobe/picking";
 import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling";
-import {
-  deriveKabschRotationForTwoPointPairs,
-  removeRollFromRotation
-} from "../utils/interaction";
 
 export type { CountryFeature, GlobeEventData } from "./globeTypes";
 
@@ -135,20 +132,6 @@ export function InteractiveGlobe({
     const worldYAxis = new THREE.Vector3(0, 1, 0);
     const longitudeRotation = new THREE.Quaternion();
     const latitudeRotation = new THREE.Quaternion();
-    const pinchAnchorLocalA = new THREE.Vector3();
-    const pinchAnchorLocalB = new THREE.Vector3();
-    const pinchAnchorWorldA = new THREE.Vector3();
-    const pinchAnchorWorldB = new THREE.Vector3();
-    const pinchCenterAnchorLocal = new THREE.Vector3();
-    const pinchCenterAnchorWorld = new THREE.Vector3();
-    const pinchTargetSurfaceA = new THREE.Vector3();
-    const pinchTargetSurfaceB = new THREE.Vector3();
-    const pinchTargetSurfaceCenter = new THREE.Vector3();
-    const pinchRotationDelta = new THREE.Quaternion();
-    const pinchCenterRotationDelta = new THREE.Quaternion();
-    const pinchComposedOrientation = new THREE.Quaternion();
-    const pinchOrientationMatrix = new THREE.Matrix4();
-    const pinchInverseOrientation = new THREE.Quaternion();
     const maxLatitudeRotation = THREE.MathUtils.degToRad(89.5);
     const minCameraDistance = globe.getGlobeRadius() + 0.1;
     const maxCameraDistance = 540;
@@ -229,267 +212,6 @@ export function InteractiveGlobe({
 
     // pointermove/click now handled by OrbitControl
 
-    const normalizeRadians = (angle: number) => {
-      const wrapped = THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2);
-      return wrapped - Math.PI;
-    };
-
-    const latLngFromQuaternion = (orientation: THREE.Quaternion) => {
-      pinchOrientationMatrix.makeRotationFromQuaternion(orientation);
-      const e = pinchOrientationMatrix.elements;
-      return {
-        latitude: Math.asin(THREE.MathUtils.clamp(e[6], -1, 1)),
-        longitude: Math.atan2(e[8], e[0])
-      };
-    };
-
-    // --- Pinch-to-zoom handler for mobile ---
-    let lastPinchDist: number | null = null;
-    let lastPinchCenter: { x: number; y: number } | null = null;
-    let hasPinchAnchors = false;
-    let hasPinchCenterAnchor = false;
-    const minPinchRotationPixelSpan = 24;
-    const minPinchRotationChord = 0.04;
-    const minPinchRotationChordSq = minPinchRotationChord * minPinchRotationChord;
-    const minPinchCenterMotionPixels = 1.5;
-
-    const canSolvePinchRotation = (
-      pointA: THREE.Vector3,
-      pointB: THREE.Vector3,
-      pixelDistance: number
-    ) => {
-      if (pixelDistance < minPinchRotationPixelSpan) {
-        return false;
-      }
-
-      return pointA.distanceToSquared(pointB) >= minPinchRotationChordSq;
-    };
-
-    const updatePinchAnchorsFromWorld = (
-      worldPointA: THREE.Vector3,
-      worldPointB: THREE.Vector3,
-      pixelDistance: number
-    ) => {
-      if (!canSolvePinchRotation(worldPointA, worldPointB, pixelDistance)) {
-        hasPinchAnchors = false;
-        return;
-      }
-
-      pinchInverseOrientation.copy(globe.quaternion).invert();
-      pinchAnchorLocalA.copy(worldPointA).applyQuaternion(pinchInverseOrientation).normalize();
-      pinchAnchorLocalB.copy(worldPointB).applyQuaternion(pinchInverseOrientation).normalize();
-      hasPinchAnchors = true;
-    };
-
-    function getTouchCenterAndDist(touches: TouchList) {
-      if (touches.length !== 2) return null;
-      const [t1, t2] = touches;
-      const dx = t2.clientX - t1.clientX;
-      const dy = t2.clientY - t1.clientY;
-      return {
-        center: {
-          x: (t1.clientX + t2.clientX) / 2,
-          y: (t1.clientY + t2.clientY) / 2
-        },
-        dist: Math.sqrt(dx * dx + dy * dy)
-      };
-    }
-
-    function onTouchStart(e: TouchEvent) {
-      if (e.touches.length === 2) {
-        orbitControl?.cancelActiveDrag();
-        const info = getTouchCenterAndDist(e.touches);
-        if (info) {
-          lastPinchDist = info.dist;
-          lastPinchCenter = {
-            x: info.center.x,
-            y: info.center.y
-          };
-
-          const centerSurface = intersectGlobeAtClientPoint(
-            info.center.x,
-            info.center.y,
-            pinchTargetSurfaceCenter
-          );
-
-          if (centerSurface) {
-            pinchInverseOrientation.copy(globe.quaternion).invert();
-            pinchCenterAnchorLocal
-              .copy(centerSurface)
-              .applyQuaternion(pinchInverseOrientation)
-              .normalize();
-            hasPinchCenterAnchor = true;
-          } else {
-            hasPinchCenterAnchor = false;
-          }
-
-          const touchA = e.touches[0];
-          const touchB = e.touches[1];
-          const anchorWorldA = intersectGlobeAtClientPoint(
-            touchA.clientX,
-            touchA.clientY,
-            pinchAnchorWorldA
-          );
-          const anchorWorldB = intersectGlobeAtClientPoint(
-            touchB.clientX,
-            touchB.clientY,
-            pinchAnchorWorldB
-          );
-
-          if (anchorWorldA && anchorWorldB) {
-            updatePinchAnchorsFromWorld(anchorWorldA, anchorWorldB, info.dist);
-          } else {
-            hasPinchAnchors = false;
-          }
-        }
-      }
-    }
-
-    function onTouchMove(e: TouchEvent) {
-      if (e.touches.length === 2 && lastPinchDist !== null) {
-        e.preventDefault();
-        const info = getTouchCenterAndDist(e.touches);
-        if (!info) return;
-
-        const centerMotionPx = lastPinchCenter
-          ? Math.hypot(info.center.x - lastPinchCenter.x, info.center.y - lastPinchCenter.y)
-          : 0;
-
-        const touchA = e.touches[0];
-        const touchB = e.touches[1];
-        const targetSurfaceA = intersectGlobeAtClientPoint(
-          touchA.clientX,
-          touchA.clientY,
-          pinchTargetSurfaceA
-        );
-        const targetSurfaceB = intersectGlobeAtClientPoint(
-          touchB.clientX,
-          touchB.clientY,
-          pinchTargetSurfaceB
-        );
-        const targetSurfaceCenter = intersectGlobeAtClientPoint(
-          info.center.x,
-          info.center.y,
-          pinchTargetSurfaceCenter
-        );
-
-        const canRotateFromTargets =
-          !!targetSurfaceA &&
-          !!targetSurfaceB &&
-          canSolvePinchRotation(targetSurfaceA, targetSurfaceB, info.dist);
-        const canRotateFromCenter =
-          centerMotionPx >= minPinchCenterMotionPixels &&
-          hasPinchCenterAnchor &&
-          !!targetSurfaceCenter;
-
-        const distancePinchScale = THREE.MathUtils.clamp(info.dist / lastPinchDist, 0.92, 1.08);
-        let pinchScale = distancePinchScale;
-
-        if (canRotateFromCenter && targetSurfaceCenter) {
-          pinchCenterAnchorWorld
-            .copy(pinchCenterAnchorLocal)
-            .applyQuaternion(globe.quaternion)
-            .normalize();
-
-          pinchCenterRotationDelta.setFromUnitVectors(
-            pinchCenterAnchorWorld,
-            targetSurfaceCenter
-          );
-          pinchComposedOrientation
-            .copy(pinchCenterRotationDelta)
-            .multiply(globe.quaternion);
-
-          const { latitude, longitude } = latLngFromQuaternion(pinchComposedOrientation);
-          rotationLatitude = THREE.MathUtils.clamp(
-            latitude,
-            -maxLatitudeRotation,
-            maxLatitudeRotation
-          );
-          rotationLongitude = normalizeRadians(longitude);
-          updateGlobeRotation();
-        } else if (hasPinchAnchors && canRotateFromTargets && targetSurfaceA && targetSurfaceB) {
-          pinchAnchorWorldA.copy(pinchAnchorLocalA).applyQuaternion(globe.quaternion).normalize();
-          pinchAnchorWorldB.copy(pinchAnchorLocalB).applyQuaternion(globe.quaternion).normalize();
-
-          const kabschResult = deriveKabschRotationForTwoPointPairs({
-            sourcePointA: pinchAnchorWorldA,
-            sourcePointB: pinchAnchorWorldB,
-            targetPointA: targetSurfaceA,
-            targetPointB: targetSurfaceB,
-            outRotation: pinchRotationDelta
-          });
-
-          // Remove roll, keep only yaw/pitch
-          removeRollFromRotation(kabschResult.rotation, pinchRotationDelta);
-
-          // Compose new orientation from current orientation and pinch delta
-          pinchComposedOrientation.copy(pinchRotationDelta).multiply(globe.quaternion);
-          const { latitude, longitude } = latLngFromQuaternion(pinchComposedOrientation);
-          rotationLatitude = THREE.MathUtils.clamp(
-            latitude,
-            -maxLatitudeRotation,
-            maxLatitudeRotation
-          );
-          rotationLongitude = normalizeRadians(longitude);
-
-          // Clamp and apply
-          updateGlobeRotation();
-
-          if (kabschResult.scale > 1e-6 && Number.isFinite(kabschResult.scale)) {
-            const clampedKabschScale = THREE.MathUtils.clamp(kabschResult.scale, 0.92, 1.08);
-            // Blend geometric fit with raw finger-distance scale to reduce jitter.
-            pinchScale = THREE.MathUtils.lerp(distancePinchScale, clampedKabschScale, 0.35);
-          }
-        }
-
-        const newDistance = THREE.MathUtils.clamp(
-          camera.position.length() / pinchScale,
-          minCameraDistance,
-          maxCameraDistance
-        );
-        camera.position.setLength(newDistance);
-
-        lastPinchDist = info.dist;
-        lastPinchCenter = {
-          x: info.center.x,
-          y: info.center.y
-        };
-
-        if (targetSurfaceCenter) {
-          pinchInverseOrientation.copy(globe.quaternion).invert();
-          pinchCenterAnchorLocal
-            .copy(targetSurfaceCenter)
-            .applyQuaternion(pinchInverseOrientation)
-            .normalize();
-          hasPinchCenterAnchor = true;
-        } else {
-          hasPinchCenterAnchor = false;
-        }
-
-        if (targetSurfaceA && targetSurfaceB) {
-          // Re-anchor each frame so pinch rotation uses incremental deltas
-          // and does not accumulate drift from the initial touch pair.
-          updatePinchAnchorsFromWorld(targetSurfaceA, targetSurfaceB, info.dist);
-        } else {
-          hasPinchAnchors = false;
-        }
-      }
-    }
-
-    function onTouchEnd(e: TouchEvent) {
-      if (e.touches.length < 2) {
-        lastPinchDist = null;
-        lastPinchCenter = null;
-        hasPinchAnchors = false;
-        hasPinchCenterAnchor = false;
-      }
-    }
-
-    renderer.domElement.addEventListener("touchstart", onTouchStart, { passive: false });
-    renderer.domElement.addEventListener("touchmove", onTouchMove, { passive: false });
-    renderer.domElement.addEventListener("touchend", onTouchEnd);
-    renderer.domElement.addEventListener("touchcancel", onTouchEnd);
-
     orbitControl = new OrbitControl({
       domElement: renderer.domElement,
       maxLatitudeRotation,
@@ -518,6 +240,27 @@ export function InteractiveGlobe({
       onClick: handleClick
     });
     orbitControl.attach();
+
+    const pinchController = createPinchGestureController({
+      domElement: renderer.domElement,
+      globe,
+      camera,
+      maxLatitudeRotation,
+      minCameraDistance,
+      maxCameraDistance,
+      getRotation: () => ({
+        latitude: rotationLatitude,
+        longitude: rotationLongitude
+      }),
+      setRotation: (latitude, longitude) => {
+        rotationLatitude = latitude;
+        rotationLongitude = longitude;
+        updateGlobeRotation();
+      },
+      intersectGlobeAtClientPoint,
+      cancelActiveDrag: () => orbitControl?.cancelActiveDrag()
+    });
+    pinchController.attach();
 
     applyPolygonStyles();
 
@@ -602,13 +345,8 @@ export function InteractiveGlobe({
       window.removeEventListener("orientationchange", resize);
       window.visualViewport?.removeEventListener("resize", resize);
       orbitControl?.dispose();
+      pinchController.dispose();
       controls.dispose();
-
-      // pointermove/click listeners now managed by OrbitControl
-      renderer.domElement.removeEventListener("touchstart", onTouchStart);
-      renderer.domElement.removeEventListener("touchmove", onTouchMove);
-      renderer.domElement.removeEventListener("touchend", onTouchEnd);
-      renderer.domElement.removeEventListener("touchcancel", onTouchEnd);
 
       renderer.dispose();
 
