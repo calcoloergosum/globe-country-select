@@ -5,8 +5,8 @@ import Globe from "./Globe";
 import type { CountryFeature, GlobeEventData } from "./globeTypes";
 import { OrbitControl } from "./OrbitControl";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
-import { createFocusTransitionController } from "./interactiveGlobe/focusTransition";
 import { createPinchGestureController } from "./interactiveGlobe/pinchZoom";
+import { createRenderLoopController } from "./interactiveGlobe/renderLoop";
 import { createSceneLifecycle } from "./interactiveGlobe/sceneLifecycle";
 import { createGlobePicker, toGlobeEventData } from "./interactiveGlobe/picking";
 import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling";
@@ -92,7 +92,6 @@ export function InteractiveGlobe({
       return;
     }
 
-    let animationFrameId = 0;
     const globe = new Globe().polygonsData(countries);
 
     if (globeImageUrl) {
@@ -117,7 +116,6 @@ export function InteractiveGlobe({
         maxCameraDistance,
         initialCameraDistance: DEFAULT_CAMERA_DISTANCE
       });
-    const focusTransitionController = createFocusTransitionController();
     let hoveredCountry: CountryFeature | null = null;
     let rotationLatitude = 0;
     let rotationLongitude = 0;
@@ -248,39 +246,29 @@ export function InteractiveGlobe({
 
     scene.add(globe);
 
-    const render = () => {
-      const nextFocusState = focusTransitionController.step({
-        focusTarget: focusTargetRef.current,
-        rotationLatitude,
-        rotationLongitude,
-        cameraDistance: camera.position.length(),
-        maxLatitudeRotation,
-        minCameraDistance,
-        maxCameraDistance
-      });
-
-      if (
-        Math.abs(nextFocusState.rotationLatitude - rotationLatitude) > 0.0001 ||
-        Math.abs(nextFocusState.rotationLongitude - rotationLongitude) > 0.0001
-      ) {
-        rotationLatitude = nextFocusState.rotationLatitude;
-        rotationLongitude = nextFocusState.rotationLongitude;
+    const renderLoopController = createRenderLoopController({
+      scene,
+      camera,
+      renderer,
+      controls,
+      maxLatitudeRotation,
+      minCameraDistance,
+      maxCameraDistance,
+      getRotation: () => ({
+        latitude: rotationLatitude,
+        longitude: rotationLongitude
+      }),
+      setRotation: (latitude, longitude) => {
+        rotationLatitude = latitude;
+        rotationLongitude = longitude;
         updateGlobeRotation();
-      }
-
-      if (Math.abs(nextFocusState.cameraDistance - camera.position.length()) > 0.05) {
-        camera.position.setLength(nextFocusState.cameraDistance);
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
+      },
+      getFocusTarget: () => focusTargetRef.current
+    });
+    renderLoopController.start();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      renderLoopController.stop();
       orbitControl?.dispose();
       pinchController.dispose();
       disposeSceneLifecycle();
