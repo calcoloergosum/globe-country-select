@@ -4,6 +4,7 @@ node_modules/
 # build outputs
 dist/
 dist-ssr/
+coverage/
 
 # TypeScript incremental build info
 *.tsbuildinfo
