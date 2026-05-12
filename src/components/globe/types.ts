@@ -6,8 +6,8 @@ export type LngLat = CountryCoordinate;
 export type PolygonRing = LngLat[];
 export type CountryPolygon = PolygonRing[];
 
-export type NumericAccessor = number | ((country: object) => number);
-export type ColorAccessor = string | ((country: object) => string);
+export type NumericAccessor = number | ((country: CountryFeature) => number);
+export type ColorAccessor = string | ((country: CountryFeature) => string);
 
 export type ParsedColor = {
   color: THREE.Color;

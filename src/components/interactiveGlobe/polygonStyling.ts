@@ -27,14 +27,11 @@ const PINNED_POLYGON_SIDE_COLOR = "rgba(220, 160, 0, 0.3)";
 const PINNED_POLYGON_STROKE_COLOR = "rgba(160, 100, 0, 0.9)";
 
 export function createPolygonStyleApplicator(globe: Globe, refs: PolygonStyleRefs) {
-  const toCountry = (value: object) => value as CountryFeature;
-
   return () => {
     const hoveredCountry = refs.getHoveredCountry();
 
     globe
-      .polygonAltitude((country: object) => {
-        const feature = toCountry(country);
+      .polygonAltitude((feature) => {
         if (refs.pinnedIsoRef.current && getFeatureIso2(feature) === refs.pinnedIsoRef.current) {
           return ACTIVE_POLYGON_ALTITUDE;
         }
@@ -49,8 +46,7 @@ export function createPolygonStyleApplicator(globe: Globe, refs: PolygonStyleRef
 
         return BASE_POLYGON_ALTITUDE;
       })
-      .polygonCapColor((country: object) => {
-        const feature = toCountry(country);
+      .polygonCapColor((feature) => {
         if (refs.pinnedIsoRef.current && getFeatureIso2(feature) === refs.pinnedIsoRef.current) {
           return PINNED_POLYGON_CAP_COLOR;
         }
@@ -65,8 +61,7 @@ export function createPolygonStyleApplicator(globe: Globe, refs: PolygonStyleRef
 
         return BASE_POLYGON_CAP_COLOR;
       })
-      .polygonSideColor((country: object) => {
-        const feature = toCountry(country);
+      .polygonSideColor((feature) => {
         if (refs.pinnedIsoRef.current && getFeatureIso2(feature) === refs.pinnedIsoRef.current) {
           return PINNED_POLYGON_SIDE_COLOR;
         }
@@ -81,8 +76,7 @@ export function createPolygonStyleApplicator(globe: Globe, refs: PolygonStyleRef
 
         return BASE_POLYGON_SIDE_COLOR;
       })
-      .polygonStrokeColor((country: object) => {
-        const feature = toCountry(country);
+      .polygonStrokeColor((feature) => {
         if (refs.pinnedIsoRef.current && getFeatureIso2(feature) === refs.pinnedIsoRef.current) {
           return PINNED_POLYGON_STROKE_COLOR;
         }
