@@ -37,7 +37,14 @@ function disposeTextureValue(value: unknown, disposedTextures: Set<string>) {
   }
 }
 
-function disposeMaterialTextures(material: THREE.Material, disposedTextures: Set<string>) {
+function disposeMaterialTextures(
+  material: THREE.Material | null | undefined,
+  disposedTextures: Set<string>
+) {
+  if (!material) {
+    return;
+  }
+
   const materialRecord = material as unknown as Record<string, unknown>;
   Object.values(materialRecord).forEach((value) => {
     disposeTextureValue(value, disposedTextures);
@@ -140,6 +147,10 @@ export function createSceneLifecycle({
       const material = mesh.material;
       if (Array.isArray(material)) {
         material.forEach((m) => {
+          if (!m) {
+            return;
+          }
+
           disposeMaterialTextures(m, disposedTextures);
           m.dispose?.();
         });
