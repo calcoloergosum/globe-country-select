@@ -88,7 +88,7 @@ describe("parseCountriesGeoJsonRaw", () => {
     });
   });
 
-  it("normalizes bbox and ignores malformed bbox values", () => {
+  it("normalizes, clamps, and orders bbox values while ignoring malformed input", () => {
     const raw = JSON.stringify({
       features: [
         {
@@ -105,6 +105,17 @@ describe("parseCountriesGeoJsonRaw", () => {
         {
           type: "Feature",
           properties: {
+            ADMIN: "Out Of Range Bbox"
+          },
+          geometry: {
+            type: "Polygon",
+            coordinates: [[[0, 0], [1, 1], [2, 2]]]
+          },
+          bbox: [190, 120, -540, -95]
+        },
+        {
+          type: "Feature",
+          properties: {
             ADMIN: "Bad Bbox"
           },
           geometry: {
@@ -116,9 +127,11 @@ describe("parseCountriesGeoJsonRaw", () => {
       ]
     });
 
-    const [trimmed, malformed] = parseCountriesGeoJsonRaw(raw);
+    const [trimmed, sanitized, malformed] = parseCountriesGeoJsonRaw(raw);
 
     expect(trimmed.bbox).toEqual([1, 2, 3, 4]);
+    expect(sanitized.bbox).toEqual([-180, -90, -170, 90]);
+    expect(getCountryLatLng(sanitized)).toEqual({ lat: 0, lng: -175 });
     expect(malformed.bbox).toBeUndefined();
     expect(getCountryLatLng(malformed)).toEqual({ lat: 0, lng: 0 });
   });
