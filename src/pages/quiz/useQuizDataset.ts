@@ -1,7 +1,7 @@
 // Builds and memoizes quiz-ready country datasets and grouped flag prompts.
 import { useMemo } from "react";
-import { hasFlag } from "country-flag-icons";
 import type { CountryFeature } from "../../components/InteractiveGlobe";
+import { hasFlagIcon } from "../../utils/flagIcons";
 import { buildFlagPrompts, type QuizCountry, type QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
 import {
   getCountryLatLng,
@@ -38,7 +38,7 @@ export function useQuizDataset(rawCountriesGeoJson: string): QuizDataset {
       })
       .filter(
         (country): country is QuizCountry<CountryFeature> =>
-          !!country.isoAlpha2 && hasFlag(country.isoAlpha2)
+          !!country.isoAlpha2 && hasFlagIcon(country.isoAlpha2)
       );
   }, [countries]);
 

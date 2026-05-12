@@ -119,6 +119,7 @@ body {
 }
 
 .main-country-flag {
+  display: block;
   width: 100%;
   max-width: 240px;
   aspect-ratio: 3 / 2;
@@ -208,8 +209,10 @@ body {
 }
 
 .quiz-flag {
+  display: block;
   width: 100%;
   max-width: 240px;
+  aspect-ratio: 3 / 2;
   border-radius: 6px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 }
