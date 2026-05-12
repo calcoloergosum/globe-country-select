@@ -162,7 +162,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
           onPointClick={result === null ? handleGlobeClick : undefined}
         />
 
-        <aside className="overlay-modal" role="region" aria-label="Quiz controls">
+        <aside className="overlay-modal quiz-modal" role="region" aria-label="Quiz controls">
           <nav className="overlay-nav" aria-label="Mode selector">
             <button
               className={`nav-btn${page === "main" ? " active" : ""}`}

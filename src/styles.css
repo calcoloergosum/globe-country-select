@@ -23,6 +23,7 @@ body {
 }
 
 .app-shell {
+  position: relative;
   min-height: 100dvh;
   height: 100dvh;
 }
@@ -148,6 +149,12 @@ body {
   width: 100%;
   height: 100%;
   min-height: 100%;
+}
+
+.globe-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .overlay-modal {
@@ -284,19 +291,129 @@ body {
 }
 
 @media (max-width: 860px) {
+  .globe-wrap {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
   .overlay-modal {
-    width: calc(100% - 1rem);
-    left: 0.5rem;
-    top: 0.5rem;
-    max-height: calc(100% - 1rem);
-    padding: 0.75rem;
+    position: relative;
+    inset: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    max-height: min(48dvh, 420px);
+    margin: 0;
+    padding: 0.9rem 0.85rem calc(0.95rem + env(safe-area-inset-bottom));
+    border-radius: 22px 22px 0 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    background: linear-gradient(180deg, rgba(10, 24, 36, 0.94) 0%, rgba(8, 17, 28, 0.92) 100%);
+    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.45);
+  }
+
+  .quiz-modal {
+    height: min(48dvh, 420px);
+  }
+
+  .overlay-modal::before {
+    content: "";
+    display: block;
+    width: 3rem;
+    height: 0.28rem;
+    margin: 0 auto 0.85rem;
+    border-radius: 999px;
+    background: rgba(180, 215, 238, 0.32);
+  }
+
+  .overlay-body {
+    margin-top: 0;
+    gap: 0.6rem;
+  }
+
+  .quiz-overlay-body {
+    margin-top: 0.8rem;
   }
 
   .overlay-body h1 {
     font-size: 1.2rem;
   }
 
+  .overlay-body h2 {
+    margin-top: 0.6rem;
+  }
+
+  .overlay-body p {
+    font-size: 0.92rem;
+  }
+
+  .globe-canvas {
+    min-height: 0;
+    height: 100%;
+  }
+
   .quiz-flag {
     max-width: 140px;
+  }
+
+  .quiz-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quiz-actions .primary {
+    grid-column: 1 / -1;
+  }
+
+  .quiz-result {
+    padding: 0.8rem;
+    font-size: 0.92rem;
+  }
+
+  .quiz-result .quiz-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .overlay-modal {
+    max-height: min(54dvh, 460px);
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .quiz-modal {
+    height: min(54dvh, 460px);
+  }
+
+  .overlay-nav {
+    width: 100%;
+  }
+
+  .nav-btn {
+    flex: 1 1 0;
+    padding: 0.55rem 0.8rem;
+  }
+
+  .overlay-body h1 {
+    font-size: 1.05rem;
+  }
+
+  .main-country-flag,
+  .quiz-flag {
+    max-width: 120px;
+  }
+
+  .quiz-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .quiz-actions .primary {
+    grid-column: auto;
   }
 }
