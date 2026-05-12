@@ -5,12 +5,11 @@ import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
 import { parseCountriesGeoJsonRaw } from "../utils/countryData";
-
-type Page = "main" | "quiz";
+import type { AppPage } from "./types";
 
 type MainPageProps = {
-  page: Page;
-  onNavigate: (page: Page) => void;
+  page: AppPage;
+  onNavigate: (page: AppPage) => void;
 };
 
 function CountryLabel({ data }: { data: GlobeEventData | null }) {

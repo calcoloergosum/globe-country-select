@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MainPage } from "./pages/MainPage";
 import { QuizPage } from "./pages/QuizPage";
-
-type Page = "main" | "quiz";
+import type { AppPage } from "./pages/types";
 
 function StarField() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,7 +66,7 @@ function StarField() {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>("main");
+  const [page, setPage] = useState<AppPage>("main");
 
   return (
     <div className="app-shell">

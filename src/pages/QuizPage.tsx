@@ -2,8 +2,8 @@ import { InteractiveGlobe, type GlobeEventData } from "../components/Interactive
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
 import { QuizOverlay } from "./quiz/QuizOverlay";
+import type { AppPage } from "./types";
 import { deriveQuizGlobeState } from "./quiz/quizGlobeState";
-import type { AppPage } from "./quiz/types";
 import { useQuizDataset } from "./quiz/useQuizDataset";
 import { useQuizKeyboardShortcuts } from "./quiz/useQuizKeyboardShortcuts";
 import { useQuizRound } from "./quiz/useQuizRound";
