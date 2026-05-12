@@ -1,3 +1,4 @@
+// Quiz flow state machine, keyboard shortcuts, answer validation, result UI.
 import { useEffect, useMemo, useState } from "react";
 import { hasFlag } from "country-flag-icons";
 import { InteractiveGlobe, type CountryFeature, type GlobeEventData } from "../components/InteractiveGlobe";
@@ -5,6 +6,12 @@ import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
 import { buildFlagPrompts, pickRandomFlagPrompt, type QuizCountry, type QuizFlagPrompt } from "../utils/pickRandomFlagPrompt";
+import {
+  getCountryLatLng,
+  getCountryName,
+  getFeatureIso2,
+  parseCountriesGeoJsonRaw
+} from "../utils/countryData";
 
 type Page = "main" | "quiz";
 
@@ -13,40 +20,12 @@ type QuizPageProps = {
   onNavigate: (page: Page) => void;
 };
 
-function getFeatureIso2(feature: CountryFeature): string | undefined {
-  const candidates = [
-    feature.properties.ISO_A2,
-    feature.properties.ISO_A2_EH,
-    feature.properties.WB_A2,
-  ];
-  return candidates
-    .map((v) => v?.trim().toUpperCase() ?? "")
-    .find((v) => /^[A-Z]{2}$/.test(v));
-}
-
-function getCountryName(feature: CountryFeature): string {
-  return feature.properties.ADMIN ?? feature.properties.NAME ?? "Unknown";
-}
-
-function getCountryLatLng(feature: CountryFeature): { lat: number; lng: number } {
-  const lat =
-    feature.properties.LABEL_Y ??
-    (feature.bbox ? (feature.bbox[1] + feature.bbox[3]) / 2 : 0);
-  const lng =
-    feature.properties.LABEL_X ??
-    (feature.bbox ? (feature.bbox[0] + feature.bbox[2]) / 2 : 0);
-  return { lat, lng };
-}
-
 function formatCountryNames(countries: QuizCountry<CountryFeature>[]): string {
   return countries.map((country) => country.name).join(", ");
 }
 
 export function QuizPage({ page, onNavigate }: QuizPageProps) {
-  const countries = useMemo(() => {
-    const parsed = JSON.parse(countriesGeoJsonRaw) as { features?: CountryFeature[] };
-    return parsed.features ?? [];
-  }, []);
+  const countries = useMemo(() => parseCountriesGeoJsonRaw(countriesGeoJsonRaw), []);
 
   const quizCountries = useMemo<QuizCountry<CountryFeature>[]>(() => {
     return countries

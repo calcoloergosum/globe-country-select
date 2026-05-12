@@ -1,3 +1,4 @@
+// Custom Three.js globe object; polygon mesh/stroke generation, style updates, texture loading.
 import * as THREE from "three";
 import type { CountryFeature } from "./globeTypes";
 

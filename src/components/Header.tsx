@@ -1,3 +1,4 @@
+// Alternate/legacy header + mode navigation component.
 type Page = "main" | "quiz";
 
 type HeaderProps = {

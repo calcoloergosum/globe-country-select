@@ -1,8 +1,10 @@
+// Explore mode composition (globe + hover/click info panel).
 import { useMemo, useState } from "react";
-import { InteractiveGlobe, type CountryFeature, type GlobeEventData } from "../components/InteractiveGlobe";
+import { InteractiveGlobe, type GlobeEventData } from "../components/InteractiveGlobe";
 import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
+import { parseCountriesGeoJsonRaw } from "../utils/countryData";
 
 type Page = "main" | "quiz";
 
@@ -28,10 +30,7 @@ export function MainPage({ page, onNavigate }: MainPageProps) {
   const [hovered, setHovered] = useState<GlobeEventData | null>(null);
   const [clicked, setClicked] = useState<GlobeEventData | null>(null);
 
-  const countries = useMemo(() => {
-    const parsed = JSON.parse(countriesGeoJsonRaw) as { features?: CountryFeature[] };
-    return parsed.features ?? [];
-  }, []);
+  const countries = useMemo(() => parseCountriesGeoJsonRaw(countriesGeoJsonRaw), []);
 
   return (
     <main className="globe-page">

@@ -1,3 +1,9 @@
+// Pointer/touch orbit controller translating gestures into yaw/pitch updates.
+
+// Utility to detect mobile devices
+function isMobileDevice() {
+  return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+}
 /*
 Core requirements for OrbitControl:
 - Begin orbit only when primary pointer-down starts on the globe surface.
@@ -27,11 +33,25 @@ type OrbitControlOptions = {
     outPointOnSurface: THREE.Vector3
   ) => THREE.Vector3 | null;
   // Callback for publishing updated pitch/yaw values.
-  onRotate: (rotationLatitude: number, rotationLongitude: number) => void;
+  onRotate: (
+    rotationLatitude: number,
+    rotationLongitude: number,
+    orientation?: THREE.Quaternion
+  ) => void;
   // Returns the current external pitch/yaw, used to resync before drag starts.
   getRotation?: () => { latitude: number; longitude: number };
+  // Returns the full rendered orientation, if parent tracks quaternion state.
+  getOrientation?: () => THREE.Quaternion;
   // Optional hook fired once when a valid drag gesture starts.
   onDragStart?: () => void;
+  // Optional hook fired when a two-finger touch gesture starts.
+  onMultiTouchStart?: (event: TouchEvent) => void;
+  // Optional hook fired on double click.
+  onDoubleClick?: (event: MouseEvent) => void;
+  // Optional hover callback, only fired when not dragging.
+  onHover?: (clientX: number, clientY: number, event: PointerEvent) => void;
+  // Optional click callback, only fired if not suppressed by drag.
+  onClick?: (clientX: number, clientY: number, event: MouseEvent) => void;
 };
 
 // Wrap angle to [-PI, PI) to keep longitude numerically stable over long drags.
@@ -90,6 +110,10 @@ export class OrbitControl {
     this.options.domElement.addEventListener("pointermove", this.onPointerMove);
     this.options.domElement.addEventListener("pointerup", this.endPointerDrag);
     this.options.domElement.addEventListener("pointercancel", this.endPointerDrag);
+    this.options.domElement.addEventListener("touchstart", this.onTouchStart, { passive: false });
+    this.options.domElement.addEventListener("dblclick", this.onDoubleClick);
+    this.options.domElement.addEventListener("pointermove", this.onPointerHover);
+    this.options.domElement.addEventListener("click", this.onPointerClick);
   }
 
   // Remove listeners to prevent leaks when scene/component unmounts.
@@ -98,7 +122,23 @@ export class OrbitControl {
     this.options.domElement.removeEventListener("pointermove", this.onPointerMove);
     this.options.domElement.removeEventListener("pointerup", this.endPointerDrag);
     this.options.domElement.removeEventListener("pointercancel", this.endPointerDrag);
+    this.options.domElement.removeEventListener("touchstart", this.onTouchStart);
+    this.options.domElement.removeEventListener("dblclick", this.onDoubleClick);
+    this.options.domElement.removeEventListener("pointermove", this.onPointerHover);
+    this.options.domElement.removeEventListener("click", this.onPointerClick);
   }
+
+  // Only fire hover callback if not dragging.
+  private onPointerHover = (event: PointerEvent) => {
+    if (this.isDragging) return;
+    this.options.onHover?.(event.clientX, event.clientY, event);
+  };
+
+  // Only fire click callback if not suppressed by drag.
+  private onPointerClick = (event: MouseEvent) => {
+    if (this.consumeDidDrag()) return;
+    this.options.onClick?.(event.clientX, event.clientY, event);
+  };
 
   // Read-only query for "currently dragging".
   // Used by hover logic to avoid expensive picking during active drag.
@@ -112,6 +152,17 @@ export class OrbitControl {
     const dragged = this.didDrag;
     this.didDrag = false;
     return dragged;
+  }
+
+  // Allow parent gestures (for example, two-finger pinch) to stop drag state.
+  cancelActiveDrag() {
+    if (this.activePointerId !== null && this.options.domElement.hasPointerCapture(this.activePointerId)) {
+      this.options.domElement.releasePointerCapture(this.activePointerId);
+    }
+
+    this.activePointerId = null;
+    this.isDragging = false;
+    this.hasDragAnchor = false;
   }
 
   private onPointerDown = (event: PointerEvent) => {
@@ -139,11 +190,24 @@ export class OrbitControl {
       this.rotationLongitude = currentRotation.longitude;
     }
 
-    this.orientationFromLatLng(
-      this.rotationLatitude,
-      this.rotationLongitude,
-      this.currentOrientation
-    );
+    const externalOrientation = this.options.getOrientation?.();
+    if (externalOrientation) {
+      this.currentOrientation.copy(externalOrientation).normalize();
+      const orientationLatLng = this.latLngFromOrientation(this.currentOrientation);
+      this.rotationLatitude = THREE.MathUtils.clamp(
+        orientationLatLng.latitude,
+        -this.options.maxLatitudeRotation,
+        this.options.maxLatitudeRotation
+      );
+      this.rotationLongitude = normalizeRadians(orientationLatLng.longitude);
+    } else {
+      this.orientationFromLatLng(
+        this.rotationLatitude,
+        this.rotationLongitude,
+        this.currentOrientation
+      );
+    }
+
     this.inverseOrientation.copy(this.currentOrientation).invert();
     this.dragAnchorLocal.copy(hitPoint).applyQuaternion(this.inverseOrientation);
     this.hasDragAnchor = true;
@@ -166,9 +230,25 @@ export class OrbitControl {
       return;
     }
 
+    // Adjust clientX/clientY for zoom scale on mobile
+    let clientX = event.clientX;
+    let clientY = event.clientY;
+    if (isMobileDevice() && window.visualViewport && window.visualViewport.scale && window.visualViewport.scale !== 1) {
+      const scale = window.visualViewport.scale;
+      // Adjust the pointer position to normalize for zoom
+      const rect = (event.target as HTMLElement)?.getBoundingClientRect?.();
+      if (rect) {
+        clientX = rect.left + (clientX - rect.left) / scale;
+        clientY = rect.top + (clientY - rect.top) / scale;
+      } else {
+        clientX = clientX / scale;
+        clientY = clientY / scale;
+      }
+    }
+
     const targetSurface = this.options.getSurfacePointAtClientPoint(
-      event.clientX,
-      event.clientY,
+      clientX,
+      clientY,
       this.currentSurfaceWorld
     );
     if (!targetSurface) {
@@ -197,8 +277,14 @@ export class OrbitControl {
     );
     this.rotationLongitude = normalizeRadians(longitude);
 
+    this.orientationFromLatLng(
+      this.rotationLatitude,
+      this.rotationLongitude,
+      this.composedOrientation
+    );
+
     // Push current orientation to parent renderer.
-    this.options.onRotate(this.rotationLatitude, this.rotationLongitude);
+    this.options.onRotate(this.rotationLatitude, this.rotationLongitude, this.composedOrientation);
 
     // Mark this gesture as drag so click selection can be suppressed once.
     this.didDrag = true;
@@ -218,6 +304,20 @@ export class OrbitControl {
     if (this.options.domElement.hasPointerCapture(event.pointerId)) {
       this.options.domElement.releasePointerCapture(event.pointerId);
     }
+  };
+
+  private onTouchStart = (event: TouchEvent) => {
+    if (event.touches.length !== 2) {
+      return;
+    }
+
+    // Two-finger gestures (pinch) should immediately stop one-finger orbit drag.
+    this.cancelActiveDrag();
+    this.options.onMultiTouchStart?.(event);
+  };
+
+  private onDoubleClick = (event: MouseEvent) => {
+    this.options.onDoubleClick?.(event);
   };
 
   private orientationFromLatLng(lat: number, lng: number, out: THREE.Quaternion) {

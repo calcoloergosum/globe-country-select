@@ -1,3 +1,4 @@
+// Top-level page mode state plus starfield background canvas.
 import { useEffect, useRef, useState } from "react";
 import { MainPage } from "./pages/MainPage";
 import { QuizPage } from "./pages/QuizPage";

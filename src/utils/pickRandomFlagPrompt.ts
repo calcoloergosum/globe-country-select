@@ -1,3 +1,5 @@
+// Flag-prompt construction and random prompt selection.
+
 import flagGroups from "./flag-groups.json";
 
 export interface QuizCountry<TFeature = unknown> {

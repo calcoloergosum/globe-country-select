@@ -1,3 +1,4 @@
+// Flag rendering wrapper using country-flag-icons with Nepal custom SVG fallback.
 import type { CSSProperties, ComponentType, SVGProps } from "react";
 import * as Flags from "country-flag-icons/react/3x2";
 import { hasFlag } from "country-flag-icons";

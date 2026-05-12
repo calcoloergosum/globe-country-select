@@ -1,3 +1,4 @@
+// Main integration layer for renderer, controls, picking, highlighting, quiz focus camera behavior.
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -5,6 +6,13 @@ import Globe from "./Globe";
 import type { CountryFeature, GlobeEventData } from "./globeTypes";
 import { OrbitControl } from "./OrbitControl";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
+import { createFocusTransitionController } from "./interactiveGlobe/focusTransition";
+import { createGlobePicker, toGlobeEventData } from "./interactiveGlobe/picking";
+import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling";
+import {
+  deriveKabschRotationForTwoPointPairs,
+  removeRollFromRotation
+} from "../utils/interaction";
 
 export type { CountryFeature, GlobeEventData } from "./globeTypes";
 
@@ -19,15 +27,6 @@ type InteractiveGlobeProps = {
   focusCountry?: CountryFeature;
   onPointHover?: (point: GlobeEventData | null) => void;
   onPointClick?: (point: GlobeEventData | null) => void;
-};
-
-type FocusTransitionPhase = "zoomOut" | "zoomIn";
-
-type FocusTransitionState = {
-  signature: string;
-  phase: FocusTransitionPhase;
-  zoomOutDistance: number;
-  desiredDistance: number;
 };
 
 const DEFAULT_WIDTH = 900;
@@ -112,6 +111,7 @@ export function InteractiveGlobe({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.style.touchAction = "none";
     container.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.15);
@@ -121,80 +121,7 @@ export function InteractiveGlobe({
     fillDirectionalLight.position.set(240, -140, -240);
     scene.add(ambientLight, keyDirectionalLight, fillDirectionalLight);
 
-    const toCountry = (value: object) => value as CountryFeature;
-
-    const getCountryLabel = (country: CountryFeature) => {
-      const name = country.properties.ADMIN ?? country.properties.NAME ?? "Unknown country";
-      const isoAlpha2Candidates = [
-        country.properties.ISO_A2,
-        country.properties.ISO_A2_EH,
-        country.properties.WB_A2
-      ];
-
-      const isoAlpha2 = isoAlpha2Candidates
-        .map((value) => value?.trim().toUpperCase() ?? "")
-        .find((value) => /^[A-Z]{2}$/.test(value));
-
-      return isoAlpha2 ? `${name} (${isoAlpha2})` : name;
-    };
-
-    const toEventData = (country: CountryFeature): GlobeEventData => {
-      const lat =
-        country.properties.LABEL_Y ??
-        (country.bbox ? (country.bbox[1] + country.bbox[3]) / 2 : 0);
-      const lng =
-        country.properties.LABEL_X ??
-        (country.bbox ? (country.bbox[0] + country.bbox[2]) / 2 : 0);
-
-      const isoAlpha2Candidates = [
-        country.properties.ISO_A2,
-        country.properties.ISO_A2_EH,
-        country.properties.WB_A2
-      ];
-      const isoAlpha2 = isoAlpha2Candidates
-        .map((value) => value?.trim().toUpperCase() ?? "")
-        .find((value) => /^[A-Z]{2}$/.test(value));
-
-      return {
-        lat,
-        lng,
-        label: getCountryLabel(country),
-        isoAlpha2
-      };
-    };
-
-    const basePolygonAltitude = 0.0002;
-    const activePolygonAltitude = 0.0003;
-    const basePolygonCapColor = "rgba(0, 0, 0, 0)";
-    const basePolygonSideColor = "rgba(0, 0, 0, 0)";
-    const basePolygonStrokeColor = "rgba(0, 0, 0, 0)";
-    const selectedPolygonCapColor = "rgba(231, 76, 60, 0.95)";
-    const selectedPolygonSideColor = "rgba(192, 57, 43, 0.26)";
-    const selectedPolygonStrokeColor = "rgba(120, 18, 13, 0.9)";
-    const hoveredPolygonCapColor = "rgba(169, 222, 255, 0.95)";
-    const hoveredPolygonSideColor = "rgba(86, 165, 221, 0.22)";
-    const hoveredPolygonStrokeColor = "rgba(14, 42, 66, 0.85)";
-    const pinnedPolygonCapColor = "rgba(255, 200, 0, 0.92)";
-    const pinnedPolygonSideColor = "rgba(220, 160, 0, 0.3)";
-    const pinnedPolygonStrokeColor = "rgba(160, 100, 0, 0.9)";
-
-    const getFeatureIso2 = (feature: CountryFeature): string | undefined => {
-      const candidates = [
-        feature.properties.ISO_A2,
-        feature.properties.ISO_A2_EH,
-        feature.properties.WB_A2
-      ];
-      return candidates
-        .map((v) => v?.trim().toUpperCase() ?? "")
-        .find((v) => /^[A-Z]{2}$/.test(v));
-    };
-
-    const globe = new Globe()
-      .polygonsData(countries)
-      .polygonAltitude(basePolygonAltitude)
-      .polygonCapColor(() => basePolygonCapColor)
-      .polygonSideColor(() => basePolygonSideColor)
-      .polygonStrokeColor(() => basePolygonStrokeColor);
+    const globe = new Globe().polygonsData(countries);
 
     if (globeImageUrl) {
       globe.globeImageUrl(globeImageUrl);
@@ -204,17 +131,28 @@ export function InteractiveGlobe({
       globe.bumpImageUrl(bumpImageUrl);
     }
 
-    const pointer = new THREE.Vector2();
-    const rayOrigin = new THREE.Vector3();
-    const rayDirection = new THREE.Vector3();
-    const globeCenter = new THREE.Vector3();
-    const hitPointOnGlobe = new THREE.Vector3();
-    const hitPointOnGlobeLocal = new THREE.Vector3();
     const worldXAxis = new THREE.Vector3(1, 0, 0);
     const worldYAxis = new THREE.Vector3(0, 1, 0);
     const longitudeRotation = new THREE.Quaternion();
     const latitudeRotation = new THREE.Quaternion();
+    const pinchAnchorLocalA = new THREE.Vector3();
+    const pinchAnchorLocalB = new THREE.Vector3();
+    const pinchAnchorWorldA = new THREE.Vector3();
+    const pinchAnchorWorldB = new THREE.Vector3();
+    const pinchCenterAnchorLocal = new THREE.Vector3();
+    const pinchCenterAnchorWorld = new THREE.Vector3();
+    const pinchTargetSurfaceA = new THREE.Vector3();
+    const pinchTargetSurfaceB = new THREE.Vector3();
+    const pinchTargetSurfaceCenter = new THREE.Vector3();
+    const pinchRotationDelta = new THREE.Quaternion();
+    const pinchCenterRotationDelta = new THREE.Quaternion();
+    const pinchComposedOrientation = new THREE.Quaternion();
+    const pinchOrientationMatrix = new THREE.Matrix4();
+    const pinchInverseOrientation = new THREE.Quaternion();
     const maxLatitudeRotation = THREE.MathUtils.degToRad(89.5);
+    const minCameraDistance = globe.getGlobeRadius() + 0.1;
+    const maxCameraDistance = 540;
+    const focusTransitionController = createFocusTransitionController();
     let hoveredCountry: CountryFeature | null = null;
     let rotationLatitude = 0;
     let rotationLongitude = 0;
@@ -227,156 +165,21 @@ export function InteractiveGlobe({
       globe.quaternion.copy(latitudeRotation).multiply(longitudeRotation);
     };
 
-    const applyPolygonStyles = () => {
-      globe
-        .polygonAltitude((country: object) => {
-          const feature = toCountry(country);
-          if (pinnedIsoRef.current && getFeatureIso2(feature) === pinnedIsoRef.current) {
-            return activePolygonAltitude;
-          }
-
-          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
-            return activePolygonAltitude;
-          }
-
-          if (highlightOnHoverRef.current && hoveredCountry && feature === hoveredCountry) {
-            return activePolygonAltitude;
-          }
-
-          return basePolygonAltitude;
-        })
-        .polygonCapColor((country: object) => {
-          const feature = toCountry(country);
-          if (pinnedIsoRef.current && getFeatureIso2(feature) === pinnedIsoRef.current) {
-            return pinnedPolygonCapColor;
-          }
-
-          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
-            return selectedPolygonCapColor;
-          }
-
-          if (highlightOnHoverRef.current && hoveredCountry && feature === hoveredCountry) {
-            return hoveredPolygonCapColor;
-          }
-
-          return basePolygonCapColor;
-        })
-        .polygonSideColor((country: object) => {
-          const feature = toCountry(country);
-          if (pinnedIsoRef.current && getFeatureIso2(feature) === pinnedIsoRef.current) {
-            return pinnedPolygonSideColor;
-          }
-
-          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
-            return selectedPolygonSideColor;
-          }
-
-          if (highlightOnHoverRef.current && hoveredCountry && feature === hoveredCountry) {
-            return hoveredPolygonSideColor;
-          }
-
-          return basePolygonSideColor;
-        })
-        .polygonStrokeColor((country: object) => {
-          const feature = toCountry(country);
-          if (pinnedIsoRef.current && getFeatureIso2(feature) === pinnedIsoRef.current) {
-            return pinnedPolygonStrokeColor;
-          }
-
-          if (selectedCountryRef.current && feature === selectedCountryRef.current) {
-            return selectedPolygonStrokeColor;
-          }
-
-          if (highlightOnHoverRef.current && hoveredCountry && feature === hoveredCountry) {
-            return hoveredPolygonStrokeColor;
-          }
-
-          return basePolygonStrokeColor;
-        });
-    };
+    const applyPolygonStyles = createPolygonStyleApplicator(globe, {
+      pinnedIsoRef,
+      selectedCountryRef,
+      highlightOnHoverRef,
+      getHoveredCountry: () => hoveredCountry
+    });
 
     applyStylesRef.current = applyPolygonStyles;
 
-    const intersectGlobeAtClientPoint = (
-      clientX: number,
-      clientY: number,
-      outPointOnSurface: THREE.Vector3
-    ) => {
-      const rect = renderer.domElement.getBoundingClientRect();
-      if (!rect.width || !rect.height) {
-        return null;
-      }
-
-      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-
-      camera.getWorldPosition(rayOrigin);
-      rayDirection
-        .set(pointer.x, pointer.y, 0.5)
-        .unproject(camera)
-        .sub(rayOrigin)
-        .normalize();
-
-      globe.getWorldPosition(globeCenter);
-      const globeRadius = globe.getGlobeRadius();
-
-      const originToCenterX = rayOrigin.x - globeCenter.x;
-      const originToCenterY = rayOrigin.y - globeCenter.y;
-      const originToCenterZ = rayOrigin.z - globeCenter.z;
-
-      const b =
-        originToCenterX * rayDirection.x +
-        originToCenterY * rayDirection.y +
-        originToCenterZ * rayDirection.z;
-      const c =
-        originToCenterX * originToCenterX +
-        originToCenterY * originToCenterY +
-        originToCenterZ * originToCenterZ -
-        globeRadius * globeRadius;
-      const discriminant = b * b - c;
-
-      if (discriminant < 0) {
-        return null;
-      }
-
-      const sqrtDiscriminant = Math.sqrt(discriminant);
-      const nearDistance = -b - sqrtDiscriminant;
-      const farDistance = -b + sqrtDiscriminant;
-      const intersectionDistance = nearDistance >= 0 ? nearDistance : farDistance >= 0 ? farDistance : null;
-
-      if (intersectionDistance === null) {
-        return null;
-      }
-
-      outPointOnSurface
-        .copy(rayDirection)
-        .multiplyScalar(intersectionDistance)
-        .add(rayOrigin)
-        .sub(globeCenter)
-        .normalize();
-
-      return outPointOnSurface;
-    };
-
-    const pickCountryAtClientPoint = (clientX: number, clientY: number) => {
-      const hitPoint = intersectGlobeAtClientPoint(clientX, clientY, hitPointOnGlobe);
-      if (!hitPoint) {
-        return null;
-      }
-
-      // Convert world-space hit to globe-local coordinates so lat/lng lookup
-      // remains correct after user-driven globe rotations.
-      hitPointOnGlobeLocal
-        .copy(hitPoint)
-        .applyQuaternion(globe.quaternion.clone().invert());
-
-      const lat = THREE.MathUtils.radToDeg(
-        Math.asin(THREE.MathUtils.clamp(hitPointOnGlobeLocal.y, -1, 1))
-      );
-      const lng = THREE.MathUtils.radToDeg(Math.atan2(hitPointOnGlobeLocal.x, hitPointOnGlobeLocal.z));
-
-      return polygonFinder.findCountryAtLatLng(lat, lng);
-    };
+    const { intersectGlobeAtClientPoint, pickCountryAtClientPoint } = createGlobePicker({
+      globe,
+      camera,
+      domElement: renderer.domElement,
+      polygonFinder
+    });
 
     const emitHover = (country: CountryFeature | null) => {
       if (hoveredCountry === country) {
@@ -389,50 +192,27 @@ export function InteractiveGlobe({
       }
 
       if (onPointHoverRef.current) {
-        onPointHoverRef.current(country ? toEventData(country) : null);
+        onPointHoverRef.current(country ? toGlobeEventData(country) : null);
       }
     };
 
-    const onPointerMove = (event: PointerEvent) => {
-      if (orbitControl?.isPointerDragging()) {
-        return;
-      }
 
-      if (!highlightOnHoverRef.current && !onPointHoverRef.current) {
-        return;
-      }
-
-      emitHover(pickCountryAtClientPoint(event.clientX, event.clientY));
+    // Hover/click logic now handled via OrbitControl callbacks
+    const handleHover = (clientX: number, clientY: number, _event: PointerEvent) => {
+      if (!highlightOnHoverRef.current && !onPointHoverRef.current) return;
+      emitHover(pickCountryAtClientPoint(clientX, clientY));
     };
 
-    const onPointerLeave = () => {
-      if (!highlightOnHoverRef.current && !onPointHoverRef.current) {
-        return;
-      }
-
-      emitHover(null);
-    };
-
-    const onCanvasClick = (event: MouseEvent) => {
-      if (orbitControl?.consumeDidDrag()) {
-        return;
-      }
-
-      const country = pickCountryAtClientPoint(event.clientX, event.clientY);
+    const handleClick = (clientX: number, clientY: number, _event: MouseEvent) => {
+      const country = pickCountryAtClientPoint(clientX, clientY);
       if (country) {
         selectedCountryRef.current = country;
         applyPolygonStyles();
-
-        if (onPointClickRef.current) {
-          onPointClickRef.current(toEventData(country));
-        }
+        if (onPointClickRef.current) onPointClickRef.current(toGlobeEventData(country));
       } else {
         selectedCountryRef.current = null;
         applyPolygonStyles();
-
-        if (onPointClickRef.current) {
-          onPointClickRef.current(null);
-        }
+        if (onPointClickRef.current) onPointClickRef.current(null);
       }
     };
 
@@ -446,10 +226,269 @@ export function InteractiveGlobe({
       controls.update();
     };
 
-    renderer.domElement.addEventListener("pointermove", onPointerMove);
-    renderer.domElement.addEventListener("pointerleave", onPointerLeave);
-    renderer.domElement.addEventListener("click", onCanvasClick);
-    renderer.domElement.addEventListener("dblclick", onCanvasDoubleClick);
+
+    // pointermove/click now handled by OrbitControl
+
+    const normalizeRadians = (angle: number) => {
+      const wrapped = THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2);
+      return wrapped - Math.PI;
+    };
+
+    const latLngFromQuaternion = (orientation: THREE.Quaternion) => {
+      pinchOrientationMatrix.makeRotationFromQuaternion(orientation);
+      const e = pinchOrientationMatrix.elements;
+      return {
+        latitude: Math.asin(THREE.MathUtils.clamp(e[6], -1, 1)),
+        longitude: Math.atan2(e[8], e[0])
+      };
+    };
+
+    // --- Pinch-to-zoom handler for mobile ---
+    let lastPinchDist: number | null = null;
+    let lastPinchCenter: { x: number; y: number } | null = null;
+    let hasPinchAnchors = false;
+    let hasPinchCenterAnchor = false;
+    const minPinchRotationPixelSpan = 24;
+    const minPinchRotationChord = 0.04;
+    const minPinchRotationChordSq = minPinchRotationChord * minPinchRotationChord;
+    const minPinchCenterMotionPixels = 1.5;
+
+    const canSolvePinchRotation = (
+      pointA: THREE.Vector3,
+      pointB: THREE.Vector3,
+      pixelDistance: number
+    ) => {
+      if (pixelDistance < minPinchRotationPixelSpan) {
+        return false;
+      }
+
+      return pointA.distanceToSquared(pointB) >= minPinchRotationChordSq;
+    };
+
+    const updatePinchAnchorsFromWorld = (
+      worldPointA: THREE.Vector3,
+      worldPointB: THREE.Vector3,
+      pixelDistance: number
+    ) => {
+      if (!canSolvePinchRotation(worldPointA, worldPointB, pixelDistance)) {
+        hasPinchAnchors = false;
+        return;
+      }
+
+      pinchInverseOrientation.copy(globe.quaternion).invert();
+      pinchAnchorLocalA.copy(worldPointA).applyQuaternion(pinchInverseOrientation).normalize();
+      pinchAnchorLocalB.copy(worldPointB).applyQuaternion(pinchInverseOrientation).normalize();
+      hasPinchAnchors = true;
+    };
+
+    function getTouchCenterAndDist(touches: TouchList) {
+      if (touches.length !== 2) return null;
+      const [t1, t2] = touches;
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      return {
+        center: {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        },
+        dist: Math.sqrt(dx * dx + dy * dy)
+      };
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        orbitControl?.cancelActiveDrag();
+        const info = getTouchCenterAndDist(e.touches);
+        if (info) {
+          lastPinchDist = info.dist;
+          lastPinchCenter = {
+            x: info.center.x,
+            y: info.center.y
+          };
+
+          const centerSurface = intersectGlobeAtClientPoint(
+            info.center.x,
+            info.center.y,
+            pinchTargetSurfaceCenter
+          );
+
+          if (centerSurface) {
+            pinchInverseOrientation.copy(globe.quaternion).invert();
+            pinchCenterAnchorLocal
+              .copy(centerSurface)
+              .applyQuaternion(pinchInverseOrientation)
+              .normalize();
+            hasPinchCenterAnchor = true;
+          } else {
+            hasPinchCenterAnchor = false;
+          }
+
+          const touchA = e.touches[0];
+          const touchB = e.touches[1];
+          const anchorWorldA = intersectGlobeAtClientPoint(
+            touchA.clientX,
+            touchA.clientY,
+            pinchAnchorWorldA
+          );
+          const anchorWorldB = intersectGlobeAtClientPoint(
+            touchB.clientX,
+            touchB.clientY,
+            pinchAnchorWorldB
+          );
+
+          if (anchorWorldA && anchorWorldB) {
+            updatePinchAnchorsFromWorld(anchorWorldA, anchorWorldB, info.dist);
+          } else {
+            hasPinchAnchors = false;
+          }
+        }
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2 && lastPinchDist !== null) {
+        e.preventDefault();
+        const info = getTouchCenterAndDist(e.touches);
+        if (!info) return;
+
+        const centerMotionPx = lastPinchCenter
+          ? Math.hypot(info.center.x - lastPinchCenter.x, info.center.y - lastPinchCenter.y)
+          : 0;
+
+        const touchA = e.touches[0];
+        const touchB = e.touches[1];
+        const targetSurfaceA = intersectGlobeAtClientPoint(
+          touchA.clientX,
+          touchA.clientY,
+          pinchTargetSurfaceA
+        );
+        const targetSurfaceB = intersectGlobeAtClientPoint(
+          touchB.clientX,
+          touchB.clientY,
+          pinchTargetSurfaceB
+        );
+        const targetSurfaceCenter = intersectGlobeAtClientPoint(
+          info.center.x,
+          info.center.y,
+          pinchTargetSurfaceCenter
+        );
+
+        const canRotateFromTargets =
+          !!targetSurfaceA &&
+          !!targetSurfaceB &&
+          canSolvePinchRotation(targetSurfaceA, targetSurfaceB, info.dist);
+        const canRotateFromCenter =
+          centerMotionPx >= minPinchCenterMotionPixels &&
+          hasPinchCenterAnchor &&
+          !!targetSurfaceCenter;
+
+        const distancePinchScale = THREE.MathUtils.clamp(info.dist / lastPinchDist, 0.92, 1.08);
+        let pinchScale = distancePinchScale;
+
+        if (canRotateFromCenter && targetSurfaceCenter) {
+          pinchCenterAnchorWorld
+            .copy(pinchCenterAnchorLocal)
+            .applyQuaternion(globe.quaternion)
+            .normalize();
+
+          pinchCenterRotationDelta.setFromUnitVectors(
+            pinchCenterAnchorWorld,
+            targetSurfaceCenter
+          );
+          pinchComposedOrientation
+            .copy(pinchCenterRotationDelta)
+            .multiply(globe.quaternion);
+
+          const { latitude, longitude } = latLngFromQuaternion(pinchComposedOrientation);
+          rotationLatitude = THREE.MathUtils.clamp(
+            latitude,
+            -maxLatitudeRotation,
+            maxLatitudeRotation
+          );
+          rotationLongitude = normalizeRadians(longitude);
+          updateGlobeRotation();
+        } else if (hasPinchAnchors && canRotateFromTargets && targetSurfaceA && targetSurfaceB) {
+          pinchAnchorWorldA.copy(pinchAnchorLocalA).applyQuaternion(globe.quaternion).normalize();
+          pinchAnchorWorldB.copy(pinchAnchorLocalB).applyQuaternion(globe.quaternion).normalize();
+
+          const kabschResult = deriveKabschRotationForTwoPointPairs({
+            sourcePointA: pinchAnchorWorldA,
+            sourcePointB: pinchAnchorWorldB,
+            targetPointA: targetSurfaceA,
+            targetPointB: targetSurfaceB,
+            outRotation: pinchRotationDelta
+          });
+
+          // Remove roll, keep only yaw/pitch
+          removeRollFromRotation(kabschResult.rotation, pinchRotationDelta);
+
+          // Compose new orientation from current orientation and pinch delta
+          pinchComposedOrientation.copy(pinchRotationDelta).multiply(globe.quaternion);
+          const { latitude, longitude } = latLngFromQuaternion(pinchComposedOrientation);
+          rotationLatitude = THREE.MathUtils.clamp(
+            latitude,
+            -maxLatitudeRotation,
+            maxLatitudeRotation
+          );
+          rotationLongitude = normalizeRadians(longitude);
+
+          // Clamp and apply
+          updateGlobeRotation();
+
+          if (kabschResult.scale > 1e-6 && Number.isFinite(kabschResult.scale)) {
+            const clampedKabschScale = THREE.MathUtils.clamp(kabschResult.scale, 0.92, 1.08);
+            // Blend geometric fit with raw finger-distance scale to reduce jitter.
+            pinchScale = THREE.MathUtils.lerp(distancePinchScale, clampedKabschScale, 0.35);
+          }
+        }
+
+        const newDistance = THREE.MathUtils.clamp(
+          camera.position.length() / pinchScale,
+          minCameraDistance,
+          maxCameraDistance
+        );
+        camera.position.setLength(newDistance);
+
+        lastPinchDist = info.dist;
+        lastPinchCenter = {
+          x: info.center.x,
+          y: info.center.y
+        };
+
+        if (targetSurfaceCenter) {
+          pinchInverseOrientation.copy(globe.quaternion).invert();
+          pinchCenterAnchorLocal
+            .copy(targetSurfaceCenter)
+            .applyQuaternion(pinchInverseOrientation)
+            .normalize();
+          hasPinchCenterAnchor = true;
+        } else {
+          hasPinchCenterAnchor = false;
+        }
+
+        if (targetSurfaceA && targetSurfaceB) {
+          // Re-anchor each frame so pinch rotation uses incremental deltas
+          // and does not accumulate drift from the initial touch pair.
+          updatePinchAnchorsFromWorld(targetSurfaceA, targetSurfaceB, info.dist);
+        } else {
+          hasPinchAnchors = false;
+        }
+      }
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (e.touches.length < 2) {
+        lastPinchDist = null;
+        lastPinchCenter = null;
+        hasPinchAnchors = false;
+        hasPinchCenterAnchor = false;
+      }
+    }
+
+    renderer.domElement.addEventListener("touchstart", onTouchStart, { passive: false });
+    renderer.domElement.addEventListener("touchmove", onTouchMove, { passive: false });
+    renderer.domElement.addEventListener("touchend", onTouchEnd);
+    renderer.domElement.addEventListener("touchcancel", onTouchEnd);
 
     orbitControl = new OrbitControl({
       domElement: renderer.domElement,
@@ -465,17 +504,20 @@ export function InteractiveGlobe({
         // from competing with active focus interpolation.
         focusTargetRef.current = null;
       },
+      onMultiTouchStart: () => {
+        // Pinch should stop answer-focus interpolation immediately.
+        focusTargetRef.current = null;
+      },
+      onDoubleClick: onCanvasDoubleClick,
       onRotate: (latitude, longitude) => {
         rotationLatitude = latitude;
         rotationLongitude = longitude;
         updateGlobeRotation();
-      }
+      },
+      onHover: handleHover,
+      onClick: handleClick
     });
     orbitControl.attach();
-
-    if (bumpImageUrl) {
-      globe.bumpImageUrl(bumpImageUrl);
-    }
 
     applyPolygonStyles();
 
@@ -486,110 +528,66 @@ export function InteractiveGlobe({
     controls.enableDamping = false;
     controls.enableZoom = true;
     controls.enableRotate = false;
+    controls.touches.TWO = THREE.TOUCH.PAN;
     controls.zoomToCursor = false;
     controls.zoomSpeed = 1.0;
-    controls.minDistance = 100;
-    controls.maxDistance = 540;
+    controls.minDistance = minCameraDistance;
+    controls.maxDistance = maxCameraDistance;
+
+    let lastKnownWidth = DEFAULT_WIDTH;
+    let lastKnownHeight = DEFAULT_HEIGHT;
 
     const resize = () => {
-      const width = Math.max(container.clientWidth, 320);
-      const height = Math.max(container.clientHeight, 360);
-      camera.aspect = width / height;
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(Math.round(rect.width), 1);
+      const height = Math.max(Math.round(rect.height), 1);
+
+      // During mobile orientation/layout transitions, dimensions can briefly
+      // collapse to 0; keep the last stable size until the next update.
+      const stableWidth = width > 1 ? width : lastKnownWidth;
+      const stableHeight = height > 1 ? height : lastKnownHeight;
+
+      lastKnownWidth = stableWidth;
+      lastKnownHeight = stableHeight;
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      camera.aspect = stableWidth / stableHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+      renderer.setSize(stableWidth, stableHeight, false);
     };
 
     const observer = new ResizeObserver(() => resize());
     observer.observe(container);
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
+    window.visualViewport?.addEventListener("resize", resize);
 
     resize();
 
-    const lerpAngle = (a: number, b: number, t: number) => {
-      let diff = b - a;
-      while (diff > Math.PI) diff -= 2 * Math.PI;
-      while (diff < -Math.PI) diff += 2 * Math.PI;
-      return a + diff * t;
-    };
-
-    let activeFocusTransition: FocusTransitionState | null = null;
-    let lastFocusSignature: string | null = null;
-
     const render = () => {
-      const focus = focusTargetRef.current;
-      if (focus) {
-        const desiredDistance = THREE.MathUtils.clamp(
-          typeof focus.zoomDistance === "number" ? focus.zoomDistance : camera.position.length(),
-          controls.minDistance,
-          controls.maxDistance
-        );
-        const focusSignature = `${focus.lat.toFixed(4)}|${focus.lng.toFixed(4)}|${desiredDistance.toFixed(3)}`;
+      const nextFocusState = focusTransitionController.step({
+        focusTarget: focusTargetRef.current,
+        rotationLatitude,
+        rotationLongitude,
+        cameraDistance: camera.position.length(),
+        maxLatitudeRotation,
+        minCameraDistance,
+        maxCameraDistance
+      });
 
-        if (lastFocusSignature !== focusSignature) {
-          const currentDistance = camera.position.length();
-          const zoomOutDistance = THREE.MathUtils.clamp(
-            Math.max(currentDistance, desiredDistance) + 70,
-            controls.minDistance,
-            controls.maxDistance
-          );
-
-          activeFocusTransition = {
-            signature: focusSignature,
-            phase: "zoomOut",
-            zoomOutDistance,
-            desiredDistance
-          };
-          lastFocusSignature = focusSignature;
-        }
-
-        const targetLat = THREE.MathUtils.clamp(
-          THREE.MathUtils.degToRad(focus.lat),
-          -maxLatitudeRotation,
-          maxLatitudeRotation
-        );
-        const targetLng = -THREE.MathUtils.degToRad(focus.lng);
-        const newLat = lerpAngle(rotationLatitude, targetLat, 0.08);
-        const newLng = lerpAngle(rotationLongitude, targetLng, 0.08);
-        if (Math.abs(newLat - rotationLatitude) > 0.0001 || Math.abs(newLng - rotationLongitude) > 0.0001) {
-          rotationLatitude = newLat;
-          rotationLongitude = newLng;
-          updateGlobeRotation();
-        }
-
-        if (activeFocusTransition?.signature === focusSignature) {
-          const currentDistance = camera.position.length();
-
-          if (activeFocusTransition.phase === "zoomOut") {
-            const nextDistance = THREE.MathUtils.lerp(
-              currentDistance,
-              activeFocusTransition.zoomOutDistance,
-              0.11
-            );
-            if (Math.abs(nextDistance - currentDistance) > 0.05) {
-              camera.position.setLength(nextDistance);
-            }
-
-            if (Math.abs(activeFocusTransition.zoomOutDistance - nextDistance) <= 0.6) {
-              activeFocusTransition.phase = "zoomIn";
-            }
-          } else {
-            const nextDistance = THREE.MathUtils.lerp(
-              currentDistance,
-              activeFocusTransition.desiredDistance,
-              0.1
-            );
-            if (Math.abs(nextDistance - currentDistance) > 0.05) {
-              camera.position.setLength(nextDistance);
-            }
-
-            if (Math.abs(activeFocusTransition.desiredDistance - nextDistance) <= 0.6) {
-              activeFocusTransition = null;
-            }
-          }
-        }
-      } else {
-        activeFocusTransition = null;
-        lastFocusSignature = null;
+      if (
+        Math.abs(nextFocusState.rotationLatitude - rotationLatitude) > 0.0001 ||
+        Math.abs(nextFocusState.rotationLongitude - rotationLongitude) > 0.0001
+      ) {
+        rotationLatitude = nextFocusState.rotationLatitude;
+        rotationLongitude = nextFocusState.rotationLongitude;
+        updateGlobeRotation();
       }
+
+      if (Math.abs(nextFocusState.cameraDistance - camera.position.length()) > 0.05) {
+        camera.position.setLength(nextFocusState.cameraDistance);
+      }
+
       controls.update();
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(render);
@@ -600,13 +598,17 @@ export function InteractiveGlobe({
     return () => {
       cancelAnimationFrame(animationFrameId);
       observer.disconnect();
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", resize);
+      window.visualViewport?.removeEventListener("resize", resize);
       orbitControl?.dispose();
       controls.dispose();
 
-      renderer.domElement.removeEventListener("pointermove", onPointerMove);
-      renderer.domElement.removeEventListener("pointerleave", onPointerLeave);
-      renderer.domElement.removeEventListener("click", onCanvasClick);
-      renderer.domElement.removeEventListener("dblclick", onCanvasDoubleClick);
+      // pointermove/click listeners now managed by OrbitControl
+      renderer.domElement.removeEventListener("touchstart", onTouchStart);
+      renderer.domElement.removeEventListener("touchmove", onTouchMove);
+      renderer.domElement.removeEventListener("touchend", onTouchEnd);
+      renderer.domElement.removeEventListener("touchcancel", onTouchEnd);
 
       renderer.dispose();
 

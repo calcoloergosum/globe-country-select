@@ -1,3 +1,4 @@
+// Module declarations for GeoJSON and raw GeoJSON imports.
 declare module "*.geojson" {
   const value: {
     type: string;

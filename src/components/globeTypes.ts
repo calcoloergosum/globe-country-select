@@ -1,3 +1,4 @@
+// Shared domain types for country features and event payload.
 export type GlobeEventData = {
   lat: number;
   lng: number;

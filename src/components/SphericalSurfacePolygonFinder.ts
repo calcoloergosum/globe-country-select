@@ -1,3 +1,4 @@
+// Spatial index + spherical point-in-polygon country lookup.
 import * as THREE from "three";
 import RBush from "rbush";
 import type { CountryFeature } from "./globeTypes";
