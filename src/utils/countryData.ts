@@ -179,7 +179,17 @@ function parseCountryBbox(value: unknown): CountryFeature["bbox"] | undefined {
     return undefined;
   }
 
-  return [bbox[0], bbox[1], bbox[2], bbox[3]];
+  const west = normalizeLongitude(bbox[0]);
+  const east = normalizeLongitude(bbox[2]);
+  const south = clampLatitude(bbox[1]);
+  const north = clampLatitude(bbox[3]);
+
+  return [
+    Math.min(west, east),
+    Math.min(south, north),
+    Math.max(west, east),
+    Math.max(south, north)
+  ];
 }
 
 function readOptionalString(value: unknown): string | undefined {
