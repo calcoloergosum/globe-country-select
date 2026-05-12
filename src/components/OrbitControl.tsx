@@ -1,9 +1,4 @@
 // Pointer/touch orbit controller translating gestures into yaw/pitch updates.
-
-// Utility to detect mobile devices
-function isMobileDevice() {
-  return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
-}
 /*
 Core requirements for OrbitControl:
 - Begin orbit only when primary pointer-down starts on the globe surface.
@@ -54,6 +49,15 @@ type OrbitControlOptions = {
   onClick?: (clientX: number, clientY: number, event: MouseEvent) => void;
 };
 
+type PointerCoordinateMode = "identity" | "viewportOffset" | "descaled" | "offsetDescaled";
+
+const pointerCoordinateModes: PointerCoordinateMode[] = [
+  "identity",
+  "viewportOffset",
+  "descaled",
+  "offsetDescaled"
+];
+
 // Wrap angle to [-PI, PI) to keep longitude numerically stable over long drags.
 const normalizeRadians = (angle: number) => {
   const wrapped = THREE.MathUtils.euclideanModulo(angle + Math.PI, Math.PI * 2);
@@ -87,10 +91,12 @@ export class OrbitControl {
   private readonly worldXAxis = new THREE.Vector3(1, 0, 0);
   private readonly worldYAxis = new THREE.Vector3(0, 1, 0);
   private readonly orientationMatrix = new THREE.Matrix4();
+  private readonly mappedClientPoint = new THREE.Vector2();
 
   // Active pointer tracking for robust pointer-capture flow.
   private activePointerId: number | null = null;
   private isDragging = false;
+  private pointerCoordinateMode: PointerCoordinateMode = "identity";
 
   // One-shot click suppression flag consumed by the parent click handler.
   private didDrag = false;
@@ -171,10 +177,10 @@ export class OrbitControl {
       return;
     }
 
-    const hitPoint = this.options.getSurfacePointAtClientPoint(
-      event.clientX,
-      event.clientY,
-      this.dragStartSurfaceWorld
+    const hitPoint = this.getSurfacePointForPointerEvent(
+      event,
+      this.dragStartSurfaceWorld,
+      false
     );
 
     // Ignore presses that do not begin on the globe surface.
@@ -230,26 +236,10 @@ export class OrbitControl {
       return;
     }
 
-    // Adjust clientX/clientY for zoom scale on mobile
-    let clientX = event.clientX;
-    let clientY = event.clientY;
-    if (isMobileDevice() && window.visualViewport && window.visualViewport.scale && window.visualViewport.scale !== 1) {
-      const scale = window.visualViewport.scale;
-      // Adjust the pointer position to normalize for zoom
-      const rect = (event.target as HTMLElement)?.getBoundingClientRect?.();
-      if (rect) {
-        clientX = rect.left + (clientX - rect.left) / scale;
-        clientY = rect.top + (clientY - rect.top) / scale;
-      } else {
-        clientX = clientX / scale;
-        clientY = clientY / scale;
-      }
-    }
-
-    const targetSurface = this.options.getSurfacePointAtClientPoint(
-      clientX,
-      clientY,
-      this.currentSurfaceWorld
+    const targetSurface = this.getSurfacePointForPointerEvent(
+      event,
+      this.currentSurfaceWorld,
+      true
     );
     if (!targetSurface) {
       return;
@@ -319,6 +309,77 @@ export class OrbitControl {
   private onDoubleClick = (event: MouseEvent) => {
     this.options.onDoubleClick?.(event);
   };
+
+  private getSurfacePointForPointerEvent(
+    event: PointerEvent,
+    outPointOnSurface: THREE.Vector3,
+    preferCurrentMode: boolean
+  ) {
+    const modes = preferCurrentMode
+      ? [this.pointerCoordinateMode, ...pointerCoordinateModes.filter((mode) => mode !== this.pointerCoordinateMode)]
+      : pointerCoordinateModes;
+
+    for (const mode of modes) {
+      this.mapPointerClientPoint(event.clientX, event.clientY, mode, this.mappedClientPoint);
+      const hitPoint = this.options.getSurfacePointAtClientPoint(
+        this.mappedClientPoint.x,
+        this.mappedClientPoint.y,
+        outPointOnSurface
+      );
+
+      if (!hitPoint) {
+        continue;
+      }
+
+      this.pointerCoordinateMode = mode;
+      return hitPoint;
+    }
+
+    return null;
+  }
+
+  private mapPointerClientPoint(
+    clientX: number,
+    clientY: number,
+    mode: PointerCoordinateMode,
+    out: THREE.Vector2
+  ) {
+    const viewport = typeof window !== "undefined" ? window.visualViewport : undefined;
+    const viewportOffsetLeft = viewport?.offsetLeft ?? 0;
+    const viewportOffsetTop = viewport?.offsetTop ?? 0;
+    const viewportScale = viewport?.scale ?? 1;
+
+    if (mode === "identity") {
+      out.set(clientX, clientY);
+      return out;
+    }
+
+    if (mode === "viewportOffset") {
+      out.set(clientX + viewportOffsetLeft, clientY + viewportOffsetTop);
+      return out;
+    }
+
+    if (!viewport || viewportScale === 1) {
+      out.set(clientX, clientY);
+      return out;
+    }
+
+    const rect = this.options.domElement.getBoundingClientRect();
+
+    if (mode === "descaled") {
+      out.set(
+        rect.left + (clientX - rect.left) / viewportScale,
+        rect.top + (clientY - rect.top) / viewportScale
+      );
+      return out;
+    }
+
+    out.set(
+      rect.left + (clientX + viewportOffsetLeft - rect.left) / viewportScale,
+      rect.top + (clientY + viewportOffsetTop - rect.top) / viewportScale
+    );
+    return out;
+  }
 
   private orientationFromLatLng(lat: number, lng: number, out: THREE.Quaternion) {
     this.longitudeRotation.setFromAxisAngle(this.worldYAxis, lng);

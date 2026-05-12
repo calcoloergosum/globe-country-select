@@ -45,7 +45,21 @@ function createDomElementMock(): DomElementMock {
     }),
     setPointerCapture,
     releasePointerCapture,
-    hasPointerCapture: vi.fn((pointerId: number) => capturedPointers.has(pointerId))
+    hasPointerCapture: vi.fn((pointerId: number) => capturedPointers.has(pointerId)),
+    getBoundingClientRect: vi.fn(
+      () =>
+        ({
+          left: 100,
+          top: 50,
+          width: 400,
+          height: 200,
+          right: 500,
+          bottom: 250,
+          x: 100,
+          y: 50,
+          toJSON: () => ({})
+        }) as DOMRect
+    )
   } as unknown as HTMLElement;
 
   const dispatch = (type: string, event: Event) => {
@@ -94,8 +108,7 @@ describe("OrbitControl", () => {
     });
     orbitControl.attach();
 
-    vi.stubGlobal("navigator", { userAgent: "iPhone" });
-    vi.stubGlobal("window", { visualViewport: { scale: 2 } });
+    vi.stubGlobal("window", { visualViewport: { scale: 2, offsetLeft: 0, offsetTop: 0 } });
 
     dom.dispatch(
       "pointerdown",
@@ -121,10 +134,62 @@ describe("OrbitControl", () => {
     );
 
     expect(dom.setPointerCapture).toHaveBeenCalledWith(7);
-    expect(getSurfacePointAtClientPoint).toHaveBeenNthCalledWith(2, 150, 80, expect.any(THREE.Vector3));
+    expect(getSurfacePointAtClientPoint).toHaveBeenCalledWith(150, 80, expect.any(THREE.Vector3));
     expect(onRotate).toHaveBeenCalledTimes(1);
     expect(orbitControl.consumeDidDrag()).toBe(true);
     expect(orbitControl.consumeDidDrag()).toBe(false);
+  });
+
+  it("falls back to visual viewport offset mapping when raw client coordinates miss", () => {
+    const dom = createDomElementMock();
+    const onRotate = vi.fn();
+
+    const getSurfacePointAtClientPoint = vi.fn(
+      (clientX: number, clientY: number, outPointOnSurface: THREE.Vector3) => {
+        if (clientX === 40 && clientY === 30) {
+          return outPointOnSurface.set(0, 0, 1);
+        }
+
+        if (clientX === 65 && clientY === 50) {
+          return outPointOnSurface.set(1, 0, 0);
+        }
+
+        return null;
+      }
+    );
+
+    const orbitControl = new OrbitControl({
+      domElement: dom.element,
+      maxLatitudeRotation: Math.PI / 2,
+      getSurfacePointAtClientPoint,
+      onRotate
+    });
+    orbitControl.attach();
+
+    vi.stubGlobal("window", { visualViewport: { scale: 1, offsetLeft: 20, offsetTop: 10 } });
+
+    dom.dispatch(
+      "pointerdown",
+      {
+        isPrimary: true,
+        button: 0,
+        pointerId: 3,
+        clientX: 40,
+        clientY: 30
+      } as unknown as Event
+    );
+
+    dom.dispatch(
+      "pointermove",
+      {
+        pointerId: 3,
+        clientX: 45,
+        clientY: 40
+      } as unknown as Event
+    );
+
+    expect(getSurfacePointAtClientPoint).toHaveBeenCalledWith(65, 50, expect.any(THREE.Vector3));
+    expect(onRotate).toHaveBeenCalledTimes(1);
   });
 
   it("cancels active pointer drag when a two-touch gesture starts", () => {
