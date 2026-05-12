@@ -4,6 +4,7 @@ import { InteractiveGlobe, type CountryFeature, type GlobeEventData } from "../c
 import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";
+import { buildFlagPrompts, pickRandomFlagPrompt, type QuizCountry, type QuizFlagPrompt } from "../utils/pickRandomFlagPrompt";
 
 type Page = "main" | "quiz";
 
@@ -11,14 +12,6 @@ type QuizPageProps = {
   page: Page;
   onNavigate: (page: Page) => void;
 };
-
-interface QuizCountry {
-  name: string;
-  isoAlpha2: string;
-  lat: number;
-  lng: number;
-  feature: CountryFeature;
-}
 
 function getFeatureIso2(feature: CountryFeature): string | undefined {
   const candidates = [
@@ -45,8 +38,8 @@ function getCountryLatLng(feature: CountryFeature): { lat: number; lng: number }
   return { lat, lng };
 }
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+function formatCountryNames(countries: QuizCountry<CountryFeature>[]): string {
+  return countries.map((country) => country.name).join(", ");
 }
 
 export function QuizPage({ page, onNavigate }: QuizPageProps) {
@@ -55,18 +48,23 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
     return parsed.features ?? [];
   }, []);
 
-  const quizCountries = useMemo<QuizCountry[]>(() => {
+  const quizCountries = useMemo<QuizCountry<CountryFeature>[]>(() => {
     return countries
       .map((f) => {
         const isoAlpha2 = getFeatureIso2(f);
         const { lat, lng } = getCountryLatLng(f);
         return { feature: f, isoAlpha2, name: getCountryName(f), lat, lng };
       })
-      .filter((c): c is QuizCountry => !!c.isoAlpha2 && hasFlag(c.isoAlpha2));
+      .filter((c): c is QuizCountry<CountryFeature> => !!c.isoAlpha2 && hasFlag(c.isoAlpha2));
   }, [countries]);
 
-  const [current, setCurrent] = useState<QuizCountry | null>(() =>
-    quizCountries.length > 0 ? pickRandom(quizCountries) : null
+  const quizFlagPrompts = useMemo<QuizFlagPrompt<CountryFeature>[]>(
+    () => buildFlagPrompts(quizCountries),
+    [quizCountries]
+  );
+
+  const [current, setCurrent] = useState<QuizFlagPrompt<CountryFeature> | null>(() =>
+    quizFlagPrompts.length > 0 ? pickRandomFlagPrompt(quizFlagPrompts) : null
   );
   const [quizRound, setQuizRound] = useState(0);
   const [selected, setSelected] = useState<GlobeEventData | null>(null);
@@ -74,14 +72,14 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
 
   useEffect(() => {
     // Enter quiz mode directly with a question instead of showing a start splash.
-    if (!current && quizCountries.length > 0) {
-      setCurrent(pickRandom(quizCountries));
+    if (!current && quizFlagPrompts.length > 0) {
+      setCurrent(pickRandomFlagPrompt(quizFlagPrompts));
     }
-  }, [current, quizCountries]);
+  }, [current, quizFlagPrompts]);
 
   const startQuiz = () => {
-    if (quizCountries.length === 0) return;
-    setCurrent(pickRandom(quizCountries));
+    if (quizFlagPrompts.length === 0) return;
+    setCurrent(pickRandomFlagPrompt(quizFlagPrompts));
     setSelected(null);
     setResult(null);
     setQuizRound((round) => round + 1);
@@ -94,7 +92,8 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
 
   const handleSubmit = () => {
     if (!current || !selected || result !== null) return;
-    setResult(selected.isoAlpha2 === current.isoAlpha2 ? "correct" : "incorrect");
+    const validIsoAlpha2 = new Set(current.countries.map((country) => country.isoAlpha2));
+    setResult(selected.isoAlpha2 && validIsoAlpha2.has(selected.isoAlpha2) ? "correct" : "incorrect");
     setSelected(null);
   };
 
@@ -140,10 +139,14 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [current, result, selected]);
 
-  const pinnedIso = result !== null ? current?.isoAlpha2 : undefined;
+  const answerCountry = current?.countries[0];
+  const pinnedIso = result !== null ? answerCountry?.isoAlpha2 : undefined;
   const shouldFocusAnswer = result === "incorrect" || result === "revealed";
-  const focusLatLng = shouldFocusAnswer && current ? { lat: current.lat, lng: current.lng } : undefined;
-  const focusCountry = shouldFocusAnswer ? current?.feature : undefined;
+  const focusLatLng =
+    shouldFocusAnswer && answerCountry
+      ? { lat: answerCountry.lat, lng: answerCountry.lng }
+      : undefined;
+  const focusCountry = shouldFocusAnswer ? answerCountry?.feature : undefined;
 
   return (
     <main className="globe-page">
@@ -178,13 +181,13 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
           </nav>
 
           <div className="overlay-body quiz-overlay-body">
-            {!current && quizCountries.length === 0 ? (
+            {!current && quizFlagPrompts.length === 0 ? (
               <p className="quiz-description">No quiz countries are currently available.</p>
             ) : !current ? (
               <p className="quiz-description">Preparing quiz...</p>
             ) : (
               <>
-                <CountryFlag code={current.isoAlpha2} className="quiz-flag" />
+                <CountryFlag code={current.flagCode} className="quiz-flag" />
 
                 {result === null && (
                   <>
@@ -218,7 +221,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
                 {result === "correct" && (
                   <div className="quiz-result correct">
                     <span>
-                      Correct! That&apos;s <strong>{current.name}</strong>.
+                      Correct! Valid countries for this flag: <strong>{formatCountryNames(current.countries)}</strong>.
                     </span>
                     <button className="quiz-btn" onClick={startQuiz}>
                       Next
@@ -229,7 +232,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
                 {result === "incorrect" && (
                   <div className="quiz-result incorrect">
                     <span>
-                      Incorrect! The answer was <strong>{current.name}</strong>, highlighted on the globe.
+                      Incorrect! Valid countries for this flag: <strong>{formatCountryNames(current.countries)}</strong>. One is highlighted on the globe.
                     </span>
                     <button className="quiz-btn" onClick={startQuiz}>
                       Next
@@ -240,7 +243,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
                 {result === "revealed" && (
                   <div className="quiz-result revealed">
                     <span>
-                      The answer is <strong>{current.name}</strong>, highlighted on the globe.
+                      Valid countries for this flag: <strong>{formatCountryNames(current.countries)}</strong>. One is highlighted on the globe.
                     </span>
                     <button className="quiz-btn" onClick={startQuiz}>
                       Next
