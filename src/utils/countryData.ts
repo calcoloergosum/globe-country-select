@@ -16,7 +16,13 @@ type RawCountryFeature = {
 };
 
 export function parseCountriesGeoJsonRaw(rawGeoJson: string): CountryFeature[] {
-  const parsed = JSON.parse(rawGeoJson) as { features?: unknown };
+  let parsed: { features?: unknown };
+  try {
+    parsed = JSON.parse(rawGeoJson) as { features?: unknown };
+  } catch {
+    return [];
+  }
+
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.features)) {
     return [];
   }
