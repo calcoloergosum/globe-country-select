@@ -1,13 +1,13 @@
 // Main integration layer for renderer, controls, picking, highlighting, quiz focus camera behavior.
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import Globe from "./Globe";
 import type { CountryFeature, GlobeEventData } from "./globeTypes";
 import { OrbitControl } from "./OrbitControl";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
 import { createFocusTransitionController } from "./interactiveGlobe/focusTransition";
 import { createPinchGestureController } from "./interactiveGlobe/pinchZoom";
+import { createSceneLifecycle } from "./interactiveGlobe/sceneLifecycle";
 import { createGlobePicker, toGlobeEventData } from "./interactiveGlobe/picking";
 import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling";
 
@@ -26,8 +26,6 @@ type InteractiveGlobeProps = {
   onPointClick?: (point: GlobeEventData | null) => void;
 };
 
-const DEFAULT_WIDTH = 900;
-const DEFAULT_HEIGHT = 560;
 const DEFAULT_CAMERA_DISTANCE = 320;
 
 export function InteractiveGlobe({
@@ -95,29 +93,6 @@ export function InteractiveGlobe({
     }
 
     let animationFrameId = 0;
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(45, DEFAULT_WIDTH / DEFAULT_HEIGHT, 1, 1000);
-    camera.position.set(0, 0, DEFAULT_CAMERA_DISTANCE);
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      logarithmicDepthBuffer: true
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.style.touchAction = "none";
-    container.appendChild(renderer.domElement);
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.15);
-    const keyDirectionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    keyDirectionalLight.position.set(-280, 220, 320);
-    const fillDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.55);
-    fillDirectionalLight.position.set(240, -140, -240);
-    scene.add(ambientLight, keyDirectionalLight, fillDirectionalLight);
-
     const globe = new Globe().polygonsData(countries);
 
     if (globeImageUrl) {
@@ -135,6 +110,13 @@ export function InteractiveGlobe({
     const maxLatitudeRotation = THREE.MathUtils.degToRad(89.5);
     const minCameraDistance = globe.getGlobeRadius() + 0.1;
     const maxCameraDistance = 540;
+    const { scene, camera, renderer, controls, dispose: disposeSceneLifecycle } =
+      createSceneLifecycle({
+        container,
+        minCameraDistance,
+        maxCameraDistance,
+        initialCameraDistance: DEFAULT_CAMERA_DISTANCE
+      });
     const focusTransitionController = createFocusTransitionController();
     let hoveredCountry: CountryFeature | null = null;
     let rotationLatitude = 0;
@@ -266,47 +248,6 @@ export function InteractiveGlobe({
 
     scene.add(globe);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enablePan = false;
-    controls.enableDamping = false;
-    controls.enableZoom = true;
-    controls.enableRotate = false;
-    controls.touches.TWO = THREE.TOUCH.PAN;
-    controls.zoomToCursor = false;
-    controls.zoomSpeed = 1.0;
-    controls.minDistance = minCameraDistance;
-    controls.maxDistance = maxCameraDistance;
-
-    let lastKnownWidth = DEFAULT_WIDTH;
-    let lastKnownHeight = DEFAULT_HEIGHT;
-
-    const resize = () => {
-      const rect = container.getBoundingClientRect();
-      const width = Math.max(Math.round(rect.width), 1);
-      const height = Math.max(Math.round(rect.height), 1);
-
-      // During mobile orientation/layout transitions, dimensions can briefly
-      // collapse to 0; keep the last stable size until the next update.
-      const stableWidth = width > 1 ? width : lastKnownWidth;
-      const stableHeight = height > 1 ? height : lastKnownHeight;
-
-      lastKnownWidth = stableWidth;
-      lastKnownHeight = stableHeight;
-
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      camera.aspect = stableWidth / stableHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(stableWidth, stableHeight, false);
-    };
-
-    const observer = new ResizeObserver(() => resize());
-    observer.observe(container);
-    window.addEventListener("resize", resize);
-    window.addEventListener("orientationchange", resize);
-    window.visualViewport?.addEventListener("resize", resize);
-
-    resize();
-
     const render = () => {
       const nextFocusState = focusTransitionController.step({
         focusTarget: focusTargetRef.current,
@@ -340,31 +281,9 @@ export function InteractiveGlobe({
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      observer.disconnect();
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("orientationchange", resize);
-      window.visualViewport?.removeEventListener("resize", resize);
       orbitControl?.dispose();
       pinchController.dispose();
-      controls.dispose();
-
-      renderer.dispose();
-
-      if (renderer.domElement.parentElement === container) {
-        container.removeChild(renderer.domElement);
-      }
-
-      scene.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        mesh.geometry?.dispose?.();
-
-        const material = mesh.material;
-        if (Array.isArray(material)) {
-          material.forEach((m) => m.dispose?.());
-        } else {
-          material?.dispose?.();
-        }
-      });
+      disposeSceneLifecycle();
     };
   }, [bumpImageUrl, countries, globeImageUrl, polygonFinder]);
 
