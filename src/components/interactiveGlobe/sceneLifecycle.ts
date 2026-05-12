@@ -19,6 +19,40 @@ type SceneLifecycle = {
   dispose: () => void;
 };
 
+type MaterialWithUniforms = THREE.Material & {
+  uniforms?: Record<string, { value: unknown }>;
+};
+
+function disposeTextureValue(value: unknown, disposedTextures: Set<string>) {
+  if (value instanceof THREE.Texture) {
+    if (!disposedTextures.has(value.uuid)) {
+      disposedTextures.add(value.uuid);
+      value.dispose();
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry) => disposeTextureValue(entry, disposedTextures));
+  }
+}
+
+function disposeMaterialTextures(material: THREE.Material, disposedTextures: Set<string>) {
+  const materialRecord = material as unknown as Record<string, unknown>;
+  Object.values(materialRecord).forEach((value) => {
+    disposeTextureValue(value, disposedTextures);
+  });
+
+  const uniforms = (material as MaterialWithUniforms).uniforms;
+  if (!uniforms) {
+    return;
+  }
+
+  Object.values(uniforms).forEach((uniform) => {
+    disposeTextureValue(uniform?.value, disposedTextures);
+  });
+}
+
 export function createSceneLifecycle({
   container,
   minCameraDistance,
@@ -98,14 +132,19 @@ export function createSceneLifecycle({
       container.removeChild(renderer.domElement);
     }
 
+    const disposedTextures = new Set<string>();
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       mesh.geometry?.dispose?.();
 
       const material = mesh.material;
       if (Array.isArray(material)) {
-        material.forEach((m) => m.dispose?.());
+        material.forEach((m) => {
+          disposeMaterialTextures(m, disposedTextures);
+          m.dispose?.();
+        });
       } else {
+        disposeMaterialTextures(material, disposedTextures);
         material?.dispose?.();
       }
     });
