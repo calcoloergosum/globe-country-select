@@ -1,3 +1,4 @@
+// Global keyboard shortcut hook for submit, skip, reveal, and next quiz actions.
 import { useEffect } from "react";
 import type { QuizResult } from "./types";
 

@@ -1,3 +1,4 @@
+// Globe picking helpers that map pointer intersections to country features and event payloads.
 import * as THREE from "three";
 import Globe from "../Globe";
 import type { CountryFeature, GlobeEventData } from "../globeTypes";

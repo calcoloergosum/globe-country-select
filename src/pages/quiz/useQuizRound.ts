@@ -1,3 +1,4 @@
+// Quiz round state machine hook for selection, submission, reveal, and progression.
 import { useCallback, useEffect, useState } from "react";
 import type { CountryFeature, GlobeEventData } from "../../components/InteractiveGlobe";
 import { pickRandomFlagPrompt, type QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";

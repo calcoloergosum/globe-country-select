@@ -1,3 +1,4 @@
+// Builds and memoizes quiz-ready country datasets and grouped flag prompts.
 import { useMemo } from "react";
 import { hasFlag } from "country-flag-icons";
 import type { CountryFeature } from "../../components/InteractiveGlobe";

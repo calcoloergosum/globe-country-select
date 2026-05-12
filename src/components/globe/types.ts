@@ -1,3 +1,4 @@
+// Shared globe-rendering types for polygon geometry, style accessors, and visuals.
 import type * as THREE from "three";
 import type { CountryCoordinate, CountryFeature } from "../globeTypes";
 

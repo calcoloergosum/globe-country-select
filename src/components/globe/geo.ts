@@ -1,3 +1,4 @@
+// Geo helpers for polygon extraction, ring cleanup, and lat/lng vector conversion.
 import * as THREE from "three";
 import type { CountryFeature } from "../globeTypes";
 import type { CountryPolygon, LngLat, PolygonRing } from "./types";

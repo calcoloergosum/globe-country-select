@@ -1,3 +1,4 @@
+// Polygon material style helpers for resolving accessors and parsing colors.
 import * as THREE from "three";
 import type { CountryFeature } from "../globeTypes";
 import type { ColorAccessor, NumericAccessor, ParsedColor } from "./types";

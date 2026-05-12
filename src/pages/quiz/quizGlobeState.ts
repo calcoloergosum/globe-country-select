@@ -1,3 +1,4 @@
+// Derives quiz-specific globe focus and pinning state from current prompt result.
 import type { CountryFeature } from "../../components/InteractiveGlobe";
 import type { QuizPrompt, QuizResult } from "./types";
 

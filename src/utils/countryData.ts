@@ -1,3 +1,4 @@
+// GeoJSON country parsing and metadata helpers (name, ISO code, labels, center point).
 import type {
   CountryFeature,
   CountryGeometry,

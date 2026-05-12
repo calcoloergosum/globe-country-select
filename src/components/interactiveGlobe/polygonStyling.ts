@@ -1,3 +1,4 @@
+// Interactive polygon styling rules for pinned, selected, and hovered countries.
 import type { MutableRefObject } from "react";
 import Globe from "../Globe";
 import type { CountryFeature } from "../globeTypes";

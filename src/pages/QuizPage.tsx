@@ -1,3 +1,4 @@
+// Quiz page composition that wires dataset, round logic, shortcuts, globe, and overlay UI.
 import { InteractiveGlobe, type GlobeEventData } from "../components/InteractiveGlobe";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
 import globeImageUrl from "../8081_earthmap10k.jpg";

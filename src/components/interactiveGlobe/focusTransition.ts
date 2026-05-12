@@ -1,3 +1,4 @@
+// Focus transition controller for smooth rotate/zoom camera movements to target countries.
 import * as THREE from "three";
 
 type FocusTransitionPhase = "zoomOut" | "zoomIn";

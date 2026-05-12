@@ -1,3 +1,4 @@
+// Quiz overlay UI with mode navigation, prompt actions, and result messaging.
 import { CountryFlag } from "../../components/CountryFlag";
 import type { GlobeEventData } from "../../components/InteractiveGlobe";
 import type { QuizCountry } from "../../utils/pickRandomFlagPrompt";

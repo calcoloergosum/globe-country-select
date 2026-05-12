@@ -1,3 +1,4 @@
+// Polygon geometry builders for triangulated fills and stroke rings on the globe surface.
 import * as THREE from "three";
 import { latLngToUnitVector, normalizeRing } from "./geo";
 import type { CountryPolygon, PolygonGeometryData } from "./types";

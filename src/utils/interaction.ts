@@ -1,5 +1,4 @@
-
-// Low-level math helpers (ray-sphere intersection, two-point rotation fit, roll removal).
+// Low-level interaction math helpers for sphere picking and two-point rotation fitting.
 import * as THREE from "three";
 
 export type SphereSurfaceIntersectionScratch = {
