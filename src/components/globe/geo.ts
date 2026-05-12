@@ -6,59 +6,14 @@ export function extractCountryPolygons(country: CountryFeature): CountryPolygon[
   const geometry = country.geometry;
 
   if (geometry.type === "Polygon") {
-    const polygon = parsePolygonCoordinates(geometry.coordinates);
-    return polygon.length ? [polygon] : [];
+    return geometry.coordinates.length ? [geometry.coordinates] : [];
   }
 
   if (geometry.type === "MultiPolygon") {
-    return parseMultiPolygonCoordinates(geometry.coordinates);
+    return geometry.coordinates;
   }
 
   return [];
-}
-
-function parseMultiPolygonCoordinates(value: unknown): CountryPolygon[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((polygonValue) => parsePolygonCoordinates(polygonValue))
-    .filter((polygon) => polygon.length > 0);
-}
-
-function parsePolygonCoordinates(value: unknown): CountryPolygon {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((ringValue) => parseRingCoordinates(ringValue))
-    .filter((ring) => ring.length > 0);
-}
-
-function parseRingCoordinates(value: unknown): PolygonRing {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const ring: LngLat[] = [];
-
-  for (const coordinate of value) {
-    if (!Array.isArray(coordinate) || coordinate.length < 2) {
-      continue;
-    }
-
-    const lng = Number(coordinate[0]);
-    const lat = Number(coordinate[1]);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-      continue;
-    }
-
-    ring.push([normalizeLongitude(lng), clampLatitude(lat)]);
-  }
-
-  return ring;
 }
 
 export function normalizeRing(ring: PolygonRing): PolygonRing {

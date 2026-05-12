@@ -16,12 +16,23 @@ type CountryProperties = {
   LABEL_Y?: number;
 };
 
+export type CountryCoordinate = [number, number];
+export type CountryPolygonCoordinates = CountryCoordinate[][];
+export type CountryMultiPolygonCoordinates = CountryPolygonCoordinates[];
+
+export type CountryGeometry =
+  | {
+      type: "Polygon";
+      coordinates: CountryPolygonCoordinates;
+    }
+  | {
+      type: "MultiPolygon";
+      coordinates: CountryMultiPolygonCoordinates;
+    };
+
 export type CountryFeature = {
   type: "Feature";
   properties: CountryProperties;
-  geometry: {
-    type: "Polygon" | "MultiPolygon";
-    coordinates: unknown;
-  };
+  geometry: CountryGeometry;
   bbox?: [number, number, number, number];
 };

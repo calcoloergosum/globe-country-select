@@ -1,7 +1,7 @@
 import type * as THREE from "three";
-import type { CountryFeature } from "../globeTypes";
+import type { CountryCoordinate, CountryFeature } from "../globeTypes";
 
-export type LngLat = readonly [number, number];
+export type LngLat = CountryCoordinate;
 export type PolygonRing = LngLat[];
 export type CountryPolygon = PolygonRing[];
 

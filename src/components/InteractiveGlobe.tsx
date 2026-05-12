@@ -671,8 +671,7 @@ function getCountryBounds(country: CountryFeature) {
   const points: Array<[number, number]> = [];
 
   if (country.geometry.type === "Polygon") {
-    const polygonCoordinates = country.geometry.coordinates as Array<Array<[number, number]>>;
-    for (const ring of polygonCoordinates) {
+    for (const ring of country.geometry.coordinates) {
       for (const [lng, lat] of ring) {
         points.push([lng, lat]);
       }
@@ -680,8 +679,7 @@ function getCountryBounds(country: CountryFeature) {
   }
 
   if (country.geometry.type === "MultiPolygon") {
-    const multiPolygonCoordinates = country.geometry.coordinates as Array<Array<Array<[number, number]>>>;
-    for (const polygon of multiPolygonCoordinates) {
+    for (const polygon of country.geometry.coordinates) {
       for (const ring of polygon) {
         for (const [lng, lat] of ring) {
           points.push([lng, lat]);
