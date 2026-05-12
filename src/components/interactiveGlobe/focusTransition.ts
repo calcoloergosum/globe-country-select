@@ -21,6 +21,7 @@ type FocusStepInput = {
   rotationLatitude: number;
   rotationLongitude: number;
   cameraDistance: number;
+  deltaSeconds: number;
   maxLatitudeRotation: number;
   minCameraDistance: number;
   maxCameraDistance: number;
@@ -39,6 +40,11 @@ function lerpAngle(a: number, b: number, t: number) {
   return a + diff * t;
 }
 
+function toDeltaLerpFactor(perFrameFactorAt60Fps: number, deltaSeconds: number) {
+  const safeDeltaSeconds = THREE.MathUtils.clamp(deltaSeconds, 0, 0.1);
+  return 1 - Math.pow(1 - perFrameFactorAt60Fps, safeDeltaSeconds * 60);
+}
+
 export function createFocusTransitionController() {
   let activeFocusTransition: FocusTransitionState | null = null;
   let lastFocusSignature: string | null = null;
@@ -47,6 +53,7 @@ export function createFocusTransitionController() {
     step(input: FocusStepInput): FocusStepOutput {
       const {
         focusTarget,
+        deltaSeconds,
         maxLatitudeRotation,
         minCameraDistance,
         maxCameraDistance
@@ -93,8 +100,9 @@ export function createFocusTransitionController() {
         maxLatitudeRotation
       );
       const targetLng = -THREE.MathUtils.degToRad(focusTarget.lng);
-      const nextLat = lerpAngle(rotationLatitude, targetLat, 0.08);
-      const nextLng = lerpAngle(rotationLongitude, targetLng, 0.08);
+      const rotationLerpFactor = toDeltaLerpFactor(0.08, deltaSeconds);
+      const nextLat = lerpAngle(rotationLatitude, targetLat, rotationLerpFactor);
+      const nextLng = lerpAngle(rotationLongitude, targetLng, rotationLerpFactor);
 
       if (
         Math.abs(nextLat - rotationLatitude) > 0.0001 ||
@@ -106,10 +114,11 @@ export function createFocusTransitionController() {
 
       if (activeFocusTransition?.signature === focusSignature) {
         if (activeFocusTransition.phase === "zoomOut") {
+          const zoomOutLerpFactor = toDeltaLerpFactor(0.11, deltaSeconds);
           const nextDistance = THREE.MathUtils.lerp(
             cameraDistance,
             activeFocusTransition.zoomOutDistance,
-            0.11
+            zoomOutLerpFactor
           );
           if (Math.abs(nextDistance - cameraDistance) > 0.05) {
             cameraDistance = nextDistance;
@@ -119,10 +128,11 @@ export function createFocusTransitionController() {
             activeFocusTransition.phase = "zoomIn";
           }
         } else {
+          const zoomInLerpFactor = toDeltaLerpFactor(0.1, deltaSeconds);
           const nextDistance = THREE.MathUtils.lerp(
             cameraDistance,
             activeFocusTransition.desiredDistance,
-            0.1
+            zoomInLerpFactor
           );
           if (Math.abs(nextDistance - cameraDistance) > 0.05) {
             cameraDistance = nextDistance;

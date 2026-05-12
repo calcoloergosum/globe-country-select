@@ -35,11 +35,19 @@ export function createRenderLoopController({
   const focusTransitionController = createFocusTransitionController();
   let animationFrameId = 0;
   let isRunning = false;
+  let lastFrameTimeMs = 0;
 
   const render = () => {
     if (!isRunning) {
       return;
     }
+
+    const currentFrameTimeMs = performance.now();
+    const deltaSeconds =
+      lastFrameTimeMs > 0
+        ? (currentFrameTimeMs - lastFrameTimeMs) / 1000
+        : 1 / 60;
+    lastFrameTimeMs = currentFrameTimeMs;
 
     const rotation = getRotation();
     const nextFocusState = focusTransitionController.step({
@@ -47,6 +55,7 @@ export function createRenderLoopController({
       rotationLatitude: rotation.latitude,
       rotationLongitude: rotation.longitude,
       cameraDistance: camera.position.length(),
+      deltaSeconds,
       maxLatitudeRotation,
       minCameraDistance,
       maxCameraDistance
@@ -75,6 +84,7 @@ export function createRenderLoopController({
       }
 
       isRunning = true;
+      lastFrameTimeMs = 0;
       render();
     },
     stop() {
@@ -83,6 +93,7 @@ export function createRenderLoopController({
       }
 
       isRunning = false;
+      lastFrameTimeMs = 0;
       cancelAnimationFrame(animationFrameId);
     }
   };
