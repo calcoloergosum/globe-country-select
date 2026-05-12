@@ -291,8 +291,9 @@ function isPointOnRingBoundary(point: THREE.Vector3, vertices: THREE.Vector3[]):
 }
 
 function angleBetweenUnitVectors(a: THREE.Vector3, b: THREE.Vector3): number {
-  const crossLength = new THREE.Vector3().crossVectors(a, b).length();
-  return Math.atan2(crossLength, clamp(a.dot(b), -1, 1));
+  const dot = clamp(a.dot(b), -1, 1);
+  const crossLength = Math.sqrt(Math.max(0, 1 - dot * dot));
+  return Math.atan2(crossLength, dot);
 }
 
 function latLngToUnitVector(lat: number, lng: number): THREE.Vector3 {
