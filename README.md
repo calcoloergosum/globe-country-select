@@ -23,6 +23,8 @@ npm run dev      # start Vite dev server
 npm run build    # type-check + production build
 npm run preview  # preview production build
 npm run check    # TypeScript checks only
+npm run test     # run automated tests once
+npm run test:watch # watch mode for local development
 ```
 
 ## Component
