@@ -1,17 +1,18 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import type { CountryPolygon } from "./types";
 import { buildPolygonGeometryData, updateGeometryRadius } from "./geometry";
 
 describe("buildPolygonGeometryData", () => {
   it("returns null for polygons with fewer than three distinct points", () => {
-    const invalidPolygon = [[[0, 0], [1, 0], [0, 0]]];
+    const invalidPolygon: CountryPolygon = [[[0, 0], [1, 0], [0, 0]]];
 
     expect(buildPolygonGeometryData(invalidPolygon, 100, 0.001)).toBeNull();
   });
 
   it("builds fill and stroke geometry for outer ring and holes", () => {
-    const polygon = [
+    const polygon: CountryPolygon = [
       [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
       [[2, 2], [4, 2], [4, 4], [2, 4], [2, 2]]
     ];

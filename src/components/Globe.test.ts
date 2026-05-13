@@ -30,8 +30,10 @@ describe("Globe", () => {
   it("drops stale globe texture requests and disposes replaced textures", () => {
     const loadCallbacks: Array<(texture: THREE.Texture) => void> = [];
     vi.spyOn(THREE.TextureLoader.prototype, "load").mockImplementation(
-      (_url: string, onLoad: (texture: THREE.Texture) => void) => {
-        loadCallbacks.push(onLoad);
+      (_url: string, onLoad?: (texture: THREE.Texture) => void) => {
+        if (onLoad) {
+          loadCallbacks.push(onLoad);
+        }
         return {} as THREE.Texture;
       }
     );
@@ -68,8 +70,10 @@ describe("Globe", () => {
   it("disposes prior bump texture when a new one loads", () => {
     const loadCallbacks: Array<(texture: THREE.Texture) => void> = [];
     vi.spyOn(THREE.TextureLoader.prototype, "load").mockImplementation(
-      (_url: string, onLoad: (texture: THREE.Texture) => void) => {
-        loadCallbacks.push(onLoad);
+      (_url: string, onLoad?: (texture: THREE.Texture) => void) => {
+        if (onLoad) {
+          loadCallbacks.push(onLoad);
+        }
         return {} as THREE.Texture;
       }
     );

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { CountryFeature } from "./globeTypes";
+import type { CountryFeature, CountryPolygonCoordinates } from "./globeTypes";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
 
-function makePolygonCountry(name: string, coordinates: number[][][]): CountryFeature {
+function makePolygonCountry(name: string, coordinates: CountryPolygonCoordinates): CountryFeature {
   return {
     type: "Feature",
     properties: {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { CountryFeature } from "../globeTypes";
+import type { CountryFeature, CountryMultiPolygonCoordinates, CountryPolygonCoordinates } from "../globeTypes";
 import { extractCountryPolygons, latLngToUnitVector, normalizeRing } from "./geo";
 
-function makePolygonFeature(coordinates: number[][][]): CountryFeature {
+function makePolygonFeature(coordinates: CountryPolygonCoordinates): CountryFeature {
   return {
     type: "Feature",
     properties: {},
@@ -14,7 +14,7 @@ function makePolygonFeature(coordinates: number[][][]): CountryFeature {
   };
 }
 
-function makeMultiPolygonFeature(coordinates: number[][][][]): CountryFeature {
+function makeMultiPolygonFeature(coordinates: CountryMultiPolygonCoordinates): CountryFeature {
   return {
     type: "Feature",
     properties: {},
@@ -27,7 +27,7 @@ function makeMultiPolygonFeature(coordinates: number[][][][]): CountryFeature {
 
 describe("extractCountryPolygons", () => {
   it("wraps non-empty Polygon coordinates as a single polygon", () => {
-    const polygon = [[[0, 0], [1, 0], [1, 1], [0, 0]]];
+    const polygon: CountryPolygonCoordinates = [[[0, 0], [1, 0], [1, 1], [0, 0]]];
     const country = makePolygonFeature(polygon);
 
     expect(extractCountryPolygons(country)).toEqual([polygon]);
@@ -40,7 +40,7 @@ describe("extractCountryPolygons", () => {
   });
 
   it("returns MultiPolygon coordinates unchanged", () => {
-    const multiPolygon = [
+    const multiPolygon: CountryMultiPolygonCoordinates = [
       [[[0, 0], [1, 0], [1, 1], [0, 0]]],
       [[[10, 10], [11, 10], [11, 11], [10, 10]]]
     ];

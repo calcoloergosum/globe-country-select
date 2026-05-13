@@ -3,9 +3,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { CountryFeature } from "../../components/InteractiveGlobe";
+import type { QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
 import { QuizOverlay } from "./QuizOverlay";
 
-const prompt = {
+const prompt: QuizFlagPrompt<CountryFeature> = {
   flagCode: "FR",
   countries: [
     {
@@ -22,7 +24,7 @@ const prompt = {
   ]
 };
 
-const promptWithMultipleCountries = {
+const promptWithMultipleCountries: QuizFlagPrompt<CountryFeature> = {
   flagCode: "FR",
   countries: [
     ...prompt.countries,
