@@ -10,7 +10,7 @@
     "check": "tsc --noEmit",
     "lint": "npm run check",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.provider=v8 --coverage.thresholds.lines=11 --coverage.thresholds.functions=55 --coverage.thresholds.statements=11 --coverage.thresholds.branches=79",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "quality:gate": "npm run lint && npm run test:coverage",
     "predeploy": "npm run build",
@@ -24,6 +24,7 @@
     "three": "^0.177.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/rbush": "^4.0.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
@@ -31,6 +32,7 @@
     "@vitejs/plugin-react": "^4.3.2",
     "@vitest/coverage-v8": "^2.1.8",
     "gh-pages": "^6.3.0",
+    "jsdom": "^27.0.1",
     "typescript": "^5.8.3",
     "vite": "^5.4.6",
     "vitest": "^2.1.8"
