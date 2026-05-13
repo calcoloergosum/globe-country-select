@@ -78,6 +78,7 @@ export function createPinchGestureController({
   const pinchInverseOrientation = new THREE.Quaternion();
 
   let lastPinchDist: number | null = null;
+  let smoothedPinchDist: number | null = null;
   let lastPinchCenter: { x: number; y: number } | null = null;
   let hasPinchAnchors = false;
   let hasPinchCenterAnchor = false;
@@ -86,6 +87,9 @@ export function createPinchGestureController({
   const minPinchRotationChord = 0.04;
   const minPinchRotationChordSq = minPinchRotationChord * minPinchRotationChord;
   const minPinchCenterMotionPixels = 1.5;
+  const pinchDistanceSmoothing = 0.35;
+  const minPinchDistanceDeltaPixels = 1.5;
+  const minPinchScaleLogDelta = 0.0035;
 
   const latLngFromQuaternion = (orientation: THREE.Quaternion) => {
     pinchOrientationMatrix.makeRotationFromQuaternion(orientation);
@@ -138,6 +142,7 @@ export function createPinchGestureController({
     }
 
     lastPinchDist = info.dist;
+    smoothedPinchDist = info.dist;
     lastPinchCenter = {
       x: info.center.x,
       y: info.center.y
@@ -223,7 +228,28 @@ export function createPinchGestureController({
       hasPinchCenterAnchor &&
       !!targetSurfaceCenter;
 
-    const distancePinchScale = THREE.MathUtils.clamp(info.dist / lastPinchDist, 0.92, 1.08);
+    const previousPinchDist = lastPinchDist;
+    const nextSmoothedPinchDist =
+      smoothedPinchDist === null
+        ? info.dist
+        : THREE.MathUtils.lerp(smoothedPinchDist, info.dist, pinchDistanceSmoothing);
+    smoothedPinchDist = nextSmoothedPinchDist;
+
+    const pinchDistanceDeltaPixels = Math.abs(nextSmoothedPinchDist - previousPinchDist);
+    let distancePinchScale = 1;
+
+    if (pinchDistanceDeltaPixels >= minPinchDistanceDeltaPixels && previousPinchDist > 0) {
+      distancePinchScale = THREE.MathUtils.clamp(
+        nextSmoothedPinchDist / previousPinchDist,
+        0.92,
+        1.08
+      );
+
+      if (Math.abs(Math.log(distancePinchScale)) < minPinchScaleLogDelta) {
+        distancePinchScale = 1;
+      }
+    }
+
     let pinchScale = distancePinchScale;
     const currentRotation = getRotation();
     let nextLatitude = currentRotation.latitude;
@@ -265,20 +291,26 @@ export function createPinchGestureController({
       nextLongitude = normalizeRadians(longitude);
       setRotation(nextLatitude, nextLongitude);
 
-      if (kabschResult.scale > 1e-6 && Number.isFinite(kabschResult.scale)) {
+      if (
+        distancePinchScale !== 1 &&
+        kabschResult.scale > 1e-6 &&
+        Number.isFinite(kabschResult.scale)
+      ) {
         const clampedKabschScale = THREE.MathUtils.clamp(kabschResult.scale, 0.92, 1.08);
-        pinchScale = THREE.MathUtils.lerp(distancePinchScale, clampedKabschScale, 0.35);
+        pinchScale = THREE.MathUtils.lerp(distancePinchScale, clampedKabschScale, 0.2);
       }
     }
 
-    const newDistance = THREE.MathUtils.clamp(
-      camera.position.length() / pinchScale,
-      minCameraDistance,
-      maxCameraDistance
-    );
-    camera.position.setLength(newDistance);
+    if (pinchScale !== 1) {
+      const newDistance = THREE.MathUtils.clamp(
+        camera.position.length() / pinchScale,
+        minCameraDistance,
+        maxCameraDistance
+      );
+      camera.position.setLength(newDistance);
+    }
 
-    lastPinchDist = info.dist;
+    lastPinchDist = nextSmoothedPinchDist;
     lastPinchCenter = {
       x: info.center.x,
       y: info.center.y
@@ -308,6 +340,7 @@ export function createPinchGestureController({
     }
 
     lastPinchDist = null;
+    smoothedPinchDist = null;
     lastPinchCenter = null;
     hasPinchAnchors = false;
     hasPinchCenterAnchor = false;

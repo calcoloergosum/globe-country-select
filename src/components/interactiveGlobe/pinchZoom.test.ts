@@ -260,4 +260,48 @@ describe("createPinchGestureController", () => {
     expect(dom.element.removeEventListener).toHaveBeenCalledWith("touchend", expect.any(Function));
     expect(dom.element.removeEventListener).toHaveBeenCalledWith("touchcancel", expect.any(Function));
   });
+
+  it("ignores small pinch-distance noise to keep zoom stable", () => {
+    const dom = createDomElementMock();
+    const camera = { position: new THREE.Vector3(0, 0, 220) } as THREE.PerspectiveCamera;
+
+    const controller = createPinchGestureController({
+      domElement: dom.element,
+      globe: { quaternion: new THREE.Quaternion() } as Globe,
+      camera,
+      maxLatitudeRotation: Math.PI / 2,
+      minCameraDistance: 120,
+      maxCameraDistance: 420,
+      getRotation: () => ({ latitude: 0, longitude: 0 }),
+      setRotation: vi.fn(),
+      intersectGlobeAtClientPoint: vi.fn((_x, _y, out) => out.set(0, 0, 1))
+    });
+
+    controller.attach();
+
+    dom.dispatch(
+      "touchstart",
+      {
+        touches: createTouchList({ x: 0, y: 0 }, { x: 200, y: 0 })
+      } as unknown as Event
+    );
+
+    dom.dispatch(
+      "touchmove",
+      {
+        touches: createTouchList({ x: 0, y: 0 }, { x: 201, y: 0 }),
+        preventDefault: vi.fn()
+      } as unknown as Event
+    );
+
+    dom.dispatch(
+      "touchmove",
+      {
+        touches: createTouchList({ x: 0, y: 0 }, { x: 200, y: 0 }),
+        preventDefault: vi.fn()
+      } as unknown as Event
+    );
+
+    expect(camera.position.length()).toBeCloseTo(220, 6);
+  });
 });
