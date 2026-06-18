@@ -82,3 +82,89 @@ Use Node.js `20.19.0` or later.
 ```bash
 npm install
 npm run dev
+```
+
+## Scripts
+
+```bash
+npm run dev           # start Vite dev server
+npm run build         # type-check and production build
+npm run preview       # preview production build
+npm run check         # TypeScript checks only
+npm run test          # run automated tests once
+npm run test:watch    # watch mode for local development
+npm run test:coverage # run tests with coverage
+npm run quality:gate  # type-check and coverage gate
+```
+
+## Quality gates
+
+The project uses:
+
+- TypeScript strict mode
+- Vitest unit tests
+- coverage thresholds
+- GitHub Actions CI
+
+CI runs:
+
+```bash
+npm ci
+npm run check
+npm run test:coverage
+npm run build
+```
+
+## Main component
+
+Main component:
+
+```text
+src/components/InteractiveGlobe.tsx
+```
+
+Common props:
+
+| Prop | Purpose |
+| --- | --- |
+| `countries` | Country GeoJSON features used for rendering and picking |
+| `globeImageUrl` | Earth texture image |
+| `bumpImageUrl` | Optional bump texture image |
+| `highlightOnHover` | Enables hover highlighting |
+| `pinnedCountryIsoA2` | Pins/highlights a country by ISO alpha-2 code |
+| `clearSelectionSignal` | Clears local selected-country state when the value changes |
+| `focusLatLng` | Rotates/focuses the globe toward a latitude/longitude |
+| `focusCountry` | Country feature used to compute focus zoom distance |
+| `enableProximityPicking` | Enables forgiving near-border picking |
+| `onPointHover` | Called when hover target changes |
+| `onPointClick` | Called when click target changes |
+
+Example:
+
+```tsx
+<InteractiveGlobe
+  countries={countries}
+  globeImageUrl={globeImageUrl}
+  highlightOnHover
+  enableProximityPicking
+  onPointHover={(point) => console.log("hover", point)}
+  onPointClick={(point) => console.log("click", point)}
+/>
+```
+
+## Event payload
+
+Hover and click callbacks receive either `null` or a country payload:
+
+```ts
+type GlobeEventData = {
+  lat: number;
+  lng: number;
+  label: string;
+  isoAlpha2?: string;
+};
+```
+
+## Notes
+
+This project is currently an app, not a packaged component library. The component API is documented to clarify internal boundaries, but package distribution is not yet a goal.
