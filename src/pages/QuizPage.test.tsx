@@ -18,6 +18,7 @@ const mockState = vi.hoisted(() => {
       clearSelectionSignal?: number;
       focusLatLng?: { lat: number; lng: number };
       focusCountry?: unknown;
+      enableProximityPicking?: boolean;
       onPointClick?: ((data: { lat: number; lng: number; label: string; isoAlpha2?: string } | null) => void) | undefined;
     },
     quizOverlayProps: null as null | {
@@ -64,6 +65,7 @@ vi.mock("../components/InteractiveGlobe", () => ({
     clearSelectionSignal?: number;
     focusLatLng?: { lat: number; lng: number };
     focusCountry?: unknown;
+    enableProximityPicking?: boolean;
     onPointClick?: ((data: { lat: number; lng: number; label: string; isoAlpha2?: string } | null) => void) | undefined;
   }) => {
     mockState.interactiveGlobeProps = props;
@@ -113,6 +115,17 @@ vi.mock("./quiz/useQuizRound", () => ({
     },
     quizRound: 3,
     selected: null,
+    highlightedCountry: {
+      feature: {
+        type: "Feature",
+        properties: { ADMIN: "France", ISO_A2: "FR" },
+        geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [0, 1], [0, 0]]] }
+      },
+      isoAlpha2: "FR",
+      name: "France",
+      lat: 48.8,
+      lng: 2.3
+    },
     result: mockState.roundResult,
     startNextRound: mockState.startNextRound,
     selectCountry: mockState.selectCountry,
@@ -132,12 +145,17 @@ describe("QuizPage", () => {
     expect(mockState.useQuizKeyboardShortcuts).toHaveBeenCalledWith(
       expect.objectContaining({ hasPrompt: true, result: null })
     );
+    expect(mockState.deriveQuizGlobeState).toHaveBeenCalledWith(
+      expect.objectContaining({ isoAlpha2: "FR" }),
+      null
+    );
 
     expect(mockState.interactiveGlobeProps).toMatchObject({
       highlightOnHover: true,
       pinnedCountryIsoA2: "FR",
       clearSelectionSignal: 3,
-      focusLatLng: { lat: 48.8, lng: 2.3 }
+      focusLatLng: { lat: 48.8, lng: 2.3 },
+      enableProximityPicking: false
     });
 
     mockState.interactiveGlobeProps?.onPointClick?.({

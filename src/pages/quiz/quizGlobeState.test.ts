@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CountryFeature } from "../../components/InteractiveGlobe";
 import { deriveQuizGlobeState } from "./quizGlobeState";
-import type { QuizPrompt, QuizResult } from "./types";
+import type { QuizHighlightedCountry, QuizResult } from "./types";
 
 function makeFeature(name: string): CountryFeature {
   return {
@@ -33,55 +33,43 @@ describe("deriveQuizGlobeState", () => {
     },
     {
       result: "correct",
-      expectedPinnedIso: "FR",
-      expectedFocusLatLng: undefined,
-      expectFocusCountry: false
+      expectedPinnedIso: "GP",
+      expectedFocusLatLng: { lat: 16.3, lng: -61.5 },
+      expectFocusCountry: true
     },
     {
       result: "incorrect",
-      expectedPinnedIso: "FR",
-      expectedFocusLatLng: { lat: 48.8, lng: 2.3 },
+      expectedPinnedIso: "GP",
+      expectedFocusLatLng: { lat: 16.3, lng: -61.5 },
       expectFocusCountry: true
     },
     {
       result: "revealed",
-      expectedPinnedIso: "FR",
-      expectedFocusLatLng: { lat: 48.8, lng: 2.3 },
+      expectedPinnedIso: "GP",
+      expectedFocusLatLng: { lat: 16.3, lng: -61.5 },
       expectFocusCountry: true
     }
   ])(
-    "maps result=$result to globe state",
+    "maps result=$result to globe state for an explicit highlighted country",
     ({ result, expectedPinnedIso, expectedFocusLatLng, expectFocusCountry }) => {
-      const answerFeature = makeFeature("France");
-      const current: QuizPrompt = {
-        flagCode: "FR",
-        countries: [
-          {
-            feature: answerFeature,
-            isoAlpha2: "FR",
-            lat: 48.8,
-            lng: 2.3,
-            name: "France"
-          },
-          {
-            feature: makeFeature("Guadeloupe"),
-            isoAlpha2: "GP",
-            lat: 16.3,
-            lng: -61.5,
-            name: "Guadeloupe"
-          }
-        ]
+      const highlightedFeature = makeFeature("Guadeloupe");
+      const highlightedCountry: QuizHighlightedCountry = {
+        feature: highlightedFeature,
+        isoAlpha2: "GP",
+        lat: 16.3,
+        lng: -61.5,
+        name: "Guadeloupe"
       };
 
-      const state = deriveQuizGlobeState(current, result);
+      const state = deriveQuizGlobeState(highlightedCountry, result);
 
       expect(state.pinnedIso).toBe(expectedPinnedIso);
       expect(state.focusLatLng).toEqual(expectedFocusLatLng);
-      expect(state.focusCountry).toBe(expectFocusCountry ? answerFeature : undefined);
+      expect(state.focusCountry).toBe(expectFocusCountry ? highlightedFeature : undefined);
     }
   );
 
-  it("returns undefined fields when current prompt is null", () => {
+  it("returns undefined fields when highlighted country is null", () => {
     const state = deriveQuizGlobeState(null, "incorrect");
 
     expect(state).toEqual({

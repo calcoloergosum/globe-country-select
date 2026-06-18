@@ -21,7 +21,8 @@ describe("createFocusTransitionController", () => {
     expect(next).toEqual({
       rotationLatitude: 0.3,
       rotationLongitude: -0.2,
-      cameraDistance: 240
+      cameraDistance: 240,
+      isActive: false
     });
   });
 

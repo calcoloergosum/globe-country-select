@@ -15,6 +15,11 @@ export interface QuizFlagPrompt<TFeature = unknown> {
   countries: QuizCountry<TFeature>[];
 }
 
+type PromptPickerOptions<TFeature> = {
+  previousPrompt?: QuizFlagPrompt<TFeature> | null;
+  rng?: () => number;
+};
+
 /**
  * Maps each ISO alpha-2 code to the shasum of its SVG asset.
  * Codes that share a shasum render the same flag image.
@@ -49,6 +54,24 @@ export function buildFlagPrompts<TFeature>(countries: QuizCountry<TFeature>[]): 
   return Array.from(byShasum.values());
 }
 
-export function pickRandomFlagPrompt<TFeature>(prompts: QuizFlagPrompt<TFeature>[]): QuizFlagPrompt<TFeature> {
-  return prompts[Math.floor(Math.random() * prompts.length)];
+export function pickRandomFlagPrompt<TFeature>(
+  prompts: QuizFlagPrompt<TFeature>[],
+  rng: () => number = Math.random
+): QuizFlagPrompt<TFeature> {
+  const index = Math.min(Math.floor(rng() * prompts.length), prompts.length - 1);
+  return prompts[index];
+}
+
+export function pickNextFlagPrompt<TFeature>(
+  prompts: QuizFlagPrompt<TFeature>[],
+  { previousPrompt = null, rng = Math.random }: PromptPickerOptions<TFeature> = {}
+): QuizFlagPrompt<TFeature> | null {
+  if (prompts.length === 0) return null;
+
+  const candidates =
+    prompts.length > 1 && previousPrompt
+      ? prompts.filter((prompt) => prompt !== previousPrompt)
+      : prompts;
+
+  return pickRandomFlagPrompt(candidates.length > 0 ? candidates : prompts, rng);
 }

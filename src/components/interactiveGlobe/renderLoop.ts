@@ -33,15 +33,66 @@ export function createRenderLoopController({
   getFocusTarget
 }: RenderLoopControllerDeps) {
   const focusTransitionController = createFocusTransitionController();
-  let animationFrameId = 0;
+  let animationFrameId: number | null = null;
   let isRunning = false;
   let lastFrameTimeMs = 0;
+  let renderRequested = false;
 
-  const render = () => {
+  const isDocumentHidden = () =>
+    typeof document !== "undefined" && document.visibilityState === "hidden";
+
+  const scheduleFrame = () => {
+    if (!isRunning || animationFrameId !== null || isDocumentHidden()) {
+      return;
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+  };
+
+  const requestRender = () => {
     if (!isRunning) {
       return;
     }
 
+    renderRequested = true;
+    scheduleFrame();
+  };
+
+  const onControlsChange = () => {
+    requestRender();
+  };
+
+  const onVisibilityChange = () => {
+    if (!isRunning) {
+      return;
+    }
+
+    if (isDocumentHidden()) {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      lastFrameTimeMs = 0;
+      return;
+    }
+
+    requestRender();
+  };
+
+  const render = () => {
+    animationFrameId = null;
+
+    if (!isRunning) {
+      return;
+    }
+
+    if (isDocumentHidden()) {
+      renderRequested = true;
+      lastFrameTimeMs = 0;
+      return;
+    }
+
+    renderRequested = false;
     const currentFrameTimeMs = performance.now();
     const deltaSeconds =
       lastFrameTimeMs > 0
@@ -72,9 +123,13 @@ export function createRenderLoopController({
       camera.position.setLength(nextFocusState.cameraDistance);
     }
 
-    controls.update();
+    const controlsUpdateResult = controls.update() as unknown;
+    const controlsChanged = controlsUpdateResult === true;
     renderer.render(scene, camera);
-    animationFrameId = requestAnimationFrame(render);
+
+    if (nextFocusState.isActive || controlsChanged || renderRequested) {
+      scheduleFrame();
+    }
   };
 
   return {
@@ -85,7 +140,15 @@ export function createRenderLoopController({
 
       isRunning = true;
       lastFrameTimeMs = 0;
-      render();
+      controls.addEventListener("change", onControlsChange);
+      if (typeof document !== "undefined") {
+        document.addEventListener("visibilitychange", onVisibilityChange);
+      }
+      requestRender();
+    },
+    requestRender,
+    invalidate() {
+      requestRender();
     },
     stop() {
       if (!isRunning) {
@@ -94,7 +157,15 @@ export function createRenderLoopController({
 
       isRunning = false;
       lastFrameTimeMs = 0;
-      cancelAnimationFrame(animationFrameId);
+      renderRequested = false;
+      controls.removeEventListener("change", onControlsChange);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
     }
   };
 }

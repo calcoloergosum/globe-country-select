@@ -25,6 +25,7 @@ type PinchGestureControllerDeps = {
     outPointOnSurface: THREE.Vector3
   ) => THREE.Vector3 | null;
   cancelActiveDrag?: () => void;
+  onChange?: () => void;
 };
 
 function normalizeRadians(angle: number) {
@@ -60,7 +61,8 @@ export function createPinchGestureController({
   getRotation,
   setRotation,
   intersectGlobeAtClientPoint,
-  cancelActiveDrag
+  cancelActiveDrag,
+  onChange
 }: PinchGestureControllerDeps) {
   const pinchAnchorLocalA = new THREE.Vector3();
   const pinchAnchorLocalB = new THREE.Vector3();
@@ -254,6 +256,7 @@ export function createPinchGestureController({
     const currentRotation = getRotation();
     let nextLatitude = currentRotation.latitude;
     let nextLongitude = currentRotation.longitude;
+    let didChange = false;
 
     if (canRotateFromCenter && targetSurfaceCenter) {
       pinchCenterAnchorWorld.copy(pinchCenterAnchorLocal).applyQuaternion(globe.quaternion).normalize();
@@ -270,6 +273,7 @@ export function createPinchGestureController({
       nextLatitude = THREE.MathUtils.clamp(latitude, -maxLatitudeRotation, maxLatitudeRotation);
       nextLongitude = normalizeRadians(longitude);
       setRotation(nextLatitude, nextLongitude);
+      didChange = true;
     } else if (hasPinchAnchors && canRotateFromTargets && targetSurfaceA && targetSurfaceB) {
       pinchAnchorWorldA.copy(pinchAnchorLocalA).applyQuaternion(globe.quaternion).normalize();
       pinchAnchorWorldB.copy(pinchAnchorLocalB).applyQuaternion(globe.quaternion).normalize();
@@ -290,6 +294,7 @@ export function createPinchGestureController({
       nextLatitude = THREE.MathUtils.clamp(latitude, -maxLatitudeRotation, maxLatitudeRotation);
       nextLongitude = normalizeRadians(longitude);
       setRotation(nextLatitude, nextLongitude);
+      didChange = true;
 
       if (
         distancePinchScale !== 1 &&
@@ -308,6 +313,7 @@ export function createPinchGestureController({
         maxCameraDistance
       );
       camera.position.setLength(newDistance);
+      didChange = true;
     }
 
     lastPinchDist = nextSmoothedPinchDist;
@@ -331,6 +337,10 @@ export function createPinchGestureController({
       updatePinchAnchorsFromWorld(targetSurfaceA, targetSurfaceB, info.dist);
     } else {
       hasPinchAnchors = false;
+    }
+
+    if (didChange) {
+      onChange?.();
     }
   };
 

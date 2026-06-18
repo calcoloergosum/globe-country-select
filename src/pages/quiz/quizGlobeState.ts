@@ -1,6 +1,6 @@
 // Derives quiz-specific globe focus and pinning state from current prompt result.
 import type { CountryFeature } from "../../components/InteractiveGlobe";
-import type { QuizPrompt, QuizResult } from "./types";
+import type { QuizHighlightedCountry, QuizResult } from "./types";
 
 type QuizGlobeState = {
   pinnedIso?: string;
@@ -8,16 +8,18 @@ type QuizGlobeState = {
   focusCountry?: CountryFeature;
 };
 
-export function deriveQuizGlobeState(current: QuizPrompt | null, result: QuizResult): QuizGlobeState {
-  const answerCountry = current?.countries[0];
-  const shouldFocusAnswer = result === "incorrect" || result === "revealed";
+export function deriveQuizGlobeState(
+  highlightedCountry: QuizHighlightedCountry,
+  result: QuizResult
+): QuizGlobeState {
+  const shouldShowHighlight = result !== null && !!highlightedCountry;
 
   return {
-    pinnedIso: result !== null ? answerCountry?.isoAlpha2 : undefined,
+    pinnedIso: shouldShowHighlight ? highlightedCountry.isoAlpha2 : undefined,
     focusLatLng:
-      shouldFocusAnswer && answerCountry
-        ? { lat: answerCountry.lat, lng: answerCountry.lng }
+      shouldShowHighlight
+        ? { lat: highlightedCountry.lat, lng: highlightedCountry.lng }
         : undefined,
-    focusCountry: shouldFocusAnswer ? answerCountry?.feature : undefined
+    focusCountry: shouldShowHighlight ? highlightedCountry.feature : undefined
   };
 }

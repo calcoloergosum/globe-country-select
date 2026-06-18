@@ -52,6 +52,22 @@ describe("SphericalSurfacePolygonFinder", () => {
     expect(finder.findCountryAtLatLng(0.5, 1.005)).toBe(country);
   });
 
+  it("returns null for the same outside point when proximity probing is disabled", () => {
+    const country = makePolygonCountry("nearby", [
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0]
+      ]
+    ]);
+
+    const finder = new SphericalSurfacePolygonFinder([country], { enableProximity: false });
+
+    expect(finder.findCountryAtLatLng(0.5, 1.005)).toBeNull();
+  });
+
   it("treats ring boundaries as inside and excludes polygon holes", () => {
     const country = makePolygonCountry("holey", [
       [

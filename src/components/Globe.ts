@@ -15,6 +15,10 @@ const DEFAULT_GLOBE_RADIUS = 100;
 const DEFAULT_SEGMENTS = 64;
 const STROKE_ALTITUDE_OFFSET = 0.0012;
 
+type GlobeOptions = {
+  requestRender?: () => void;
+};
+
 export default class Globe extends THREE.Group {
   private readonly globeRadius = DEFAULT_GLOBE_RADIUS;
   private readonly globeMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
@@ -34,8 +38,9 @@ export default class Globe extends THREE.Group {
   private globeTextureRequestId = 0;
   private bumpTextureRequestId = 0;
   private polygonRefreshQueued = false;
+  private disposed = false;
 
-  constructor() {
+  constructor(private readonly options: GlobeOptions = {}) {
     super();
     this.globeMesh.castShadow = false;
     this.globeMesh.receiveShadow = false;
@@ -47,9 +52,13 @@ export default class Globe extends THREE.Group {
   }
 
   globeImageUrl(url: string) {
+    if (this.disposed) {
+      return this;
+    }
+
     const requestId = ++this.globeTextureRequestId;
     this.textureLoader.load(url, (texture) => {
-      if (requestId !== this.globeTextureRequestId) {
+      if (this.disposed || requestId !== this.globeTextureRequestId) {
         texture.dispose();
         return;
       }
@@ -58,15 +67,20 @@ export default class Globe extends THREE.Group {
       this.globeMaterial.map?.dispose();
       this.globeMaterial.map = texture;
       this.globeMaterial.needsUpdate = true;
+      this.requestRender();
     });
 
     return this;
   }
 
   bumpImageUrl(url: string) {
+    if (this.disposed) {
+      return this;
+    }
+
     const requestId = ++this.bumpTextureRequestId;
     this.textureLoader.load(url, (texture) => {
-      if (requestId !== this.bumpTextureRequestId) {
+      if (this.disposed || requestId !== this.bumpTextureRequestId) {
         texture.dispose();
         return;
       }
@@ -75,36 +89,57 @@ export default class Globe extends THREE.Group {
       this.globeMaterial.bumpMap = texture;
       this.globeMaterial.bumpScale = 2;
       this.globeMaterial.needsUpdate = true;
+      this.requestRender();
     });
 
     return this;
   }
 
   polygonsData(countries: CountryFeature[]) {
+    if (this.disposed) {
+      return this;
+    }
+
     this.countries = countries;
     this.rebuildPolygonVisuals();
     return this;
   }
 
   polygonAltitude(value: NumericAccessor) {
+    if (this.disposed) {
+      return this;
+    }
+
     this.polygonAltitudeAccessor = value;
     this.queuePolygonRefresh();
     return this;
   }
 
   polygonCapColor(value: ColorAccessor) {
+    if (this.disposed) {
+      return this;
+    }
+
     this.polygonCapColorAccessor = value;
     this.queuePolygonRefresh();
     return this;
   }
 
   polygonSideColor(value: ColorAccessor) {
+    if (this.disposed) {
+      return this;
+    }
+
     this.polygonSideColorAccessor = value;
     this.queuePolygonRefresh();
     return this;
   }
 
   polygonStrokeColor(value: ColorAccessor) {
+    if (this.disposed) {
+      return this;
+    }
+
     this.polygonStrokeColorAccessor = value;
     this.queuePolygonRefresh();
     return this;
@@ -114,19 +149,48 @@ export default class Globe extends THREE.Group {
     return this.globeRadius;
   }
 
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+
+    this.disposed = true;
+    this.disposePolygonVisuals();
+    this.globeMaterial.map?.dispose();
+    this.globeMaterial.map = null;
+    this.globeMaterial.bumpMap?.dispose();
+    this.globeMaterial.bumpMap = null;
+    this.globeMesh.geometry.dispose();
+    this.globeMaterial.dispose();
+    this.clear();
+  }
+
   private queuePolygonRefresh() {
-    if (this.polygonRefreshQueued) {
+    if (this.disposed || this.polygonRefreshQueued) {
       return;
     }
 
     this.polygonRefreshQueued = true;
     queueMicrotask(() => {
       this.polygonRefreshQueued = false;
+      if (this.disposed) {
+        return;
+      }
+
       this.refreshPolygonStyles();
+      this.requestRender();
     });
   }
 
-  private rebuildPolygonVisuals() {
+  private requestRender() {
+    if (this.disposed) {
+      return;
+    }
+
+    this.options.requestRender?.();
+  }
+
+  private disposePolygonVisuals() {
     for (const visual of this.polygonVisuals) {
       visual.fillGeometry?.dispose();
       visual.fillMaterial?.dispose();
@@ -136,6 +200,10 @@ export default class Globe extends THREE.Group {
 
     this.polygonVisuals = [];
     this.polygonsGroup.clear();
+  }
+
+  private rebuildPolygonVisuals() {
+    this.disposePolygonVisuals();
 
     for (const country of this.countries) {
       const polygons = extractCountryPolygons(country);

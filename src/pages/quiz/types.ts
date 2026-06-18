@@ -10,3 +10,5 @@ export type QuizResult = "correct" | "incorrect" | "revealed" | null;
 export type QuizPrompt = QuizFlagPrompt<CountryFeature>;
 
 export type QuizSelection = GlobeEventData | null;
+
+export type QuizHighlightedCountry = QuizPrompt["countries"][number] | null;

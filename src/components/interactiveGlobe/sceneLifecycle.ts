@@ -9,6 +9,7 @@ type SceneLifecycleOptions = {
   minCameraDistance: number;
   maxCameraDistance: number;
   initialCameraDistance: number;
+  onResize?: () => void;
 };
 
 type SceneLifecycle = {
@@ -64,7 +65,8 @@ export function createSceneLifecycle({
   container,
   minCameraDistance,
   maxCameraDistance,
-  initialCameraDistance
+  initialCameraDistance,
+  onResize
 }: SceneLifecycleOptions): SceneLifecycle {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(45, DEFAULT_WIDTH / DEFAULT_HEIGHT, 1, 1000);
@@ -118,6 +120,7 @@ export function createSceneLifecycle({
     camera.aspect = stableWidth / stableHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(stableWidth, stableHeight, false);
+    onResize?.();
   };
 
   const observer = new ResizeObserver(() => resize());

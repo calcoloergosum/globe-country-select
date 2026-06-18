@@ -20,6 +20,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
     current,
     quizRound,
     selected,
+    highlightedCountry,
     result,
     startNextRound,
     selectCountry,
@@ -37,7 +38,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
     onNextRound: startNextRound
   });
 
-  const { pinnedIso, focusLatLng, focusCountry } = deriveQuizGlobeState(current, result);
+  const { pinnedIso, focusLatLng, focusCountry } = deriveQuizGlobeState(highlightedCountry, result);
 
   const handleGlobeClick = (data: GlobeEventData | null) => {
     selectCountry(data);
@@ -54,6 +55,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
           clearSelectionSignal={quizRound}
           focusLatLng={focusLatLng}
           focusCountry={focusCountry}
+          enableProximityPicking={false}
           onPointClick={result === null ? handleGlobeClick : undefined}
         />
         <QuizOverlay

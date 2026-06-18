@@ -11,6 +11,7 @@ const mockState = vi.hoisted(() => ({
     globeImageUrl: ReturnType<typeof vi.fn>;
     bumpImageUrl: ReturnType<typeof vi.fn>;
     getGlobeRadius: ReturnType<typeof vi.fn>;
+    dispose: ReturnType<typeof vi.fn>;
   }>,
   orbitInstances: [] as Array<{
     options: {
@@ -32,6 +33,8 @@ const mockState = vi.hoisted(() => ({
   renderLoopInstances: [] as Array<{
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
+    requestRender: ReturnType<typeof vi.fn>;
+    invalidate: ReturnType<typeof vi.fn>;
   }>,
   renderLoopDeps: [] as Array<{
     getFocusTarget: () => { lat: number; lng: number; zoomDistance?: number } | null;
@@ -42,8 +45,9 @@ const mockState = vi.hoisted(() => ({
       maxCameraDistance: number;
       initialCameraDistance: number;
       container: HTMLDivElement;
+      onResize?: () => void;
     };
-    scene: { add: ReturnType<typeof vi.fn> };
+    scene: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
     camera: THREE.PerspectiveCamera;
     renderer: { domElement: HTMLCanvasElement };
     controls: { update: ReturnType<typeof vi.fn> };
@@ -60,6 +64,7 @@ vi.mock("./Globe", () => ({
     globeImageUrl = vi.fn(() => this);
     bumpImageUrl = vi.fn(() => this);
     getGlobeRadius = vi.fn(() => 100);
+    dispose = vi.fn();
 
     constructor() {
       mockState.globeInstances.push(this);
@@ -102,10 +107,11 @@ vi.mock("./interactiveGlobe/sceneLifecycle", () => ({
       maxCameraDistance: number;
       initialCameraDistance: number;
       container: HTMLDivElement;
+      onResize?: () => void;
     }) => {
       const camera = new THREE.PerspectiveCamera();
       camera.position.set(0, 0, 320);
-      const scene = { add: vi.fn() };
+      const scene = { add: vi.fn(), remove: vi.fn() };
       const controls = { update: vi.fn() };
       const renderer = { domElement: document.createElement("canvas") };
       const dispose = vi.fn();
@@ -168,7 +174,9 @@ vi.mock("./interactiveGlobe/renderLoop", () => ({
     mockState.renderLoopDeps.push(deps);
     const controller = {
       start: vi.fn(),
-      stop: vi.fn()
+      stop: vi.fn(),
+      requestRender: vi.fn(),
+      invalidate: vi.fn()
     };
     mockState.renderLoopInstances.push(controller);
     return controller;
@@ -238,6 +246,8 @@ describe("InteractiveGlobe", () => {
     expect(mockState.renderLoopInstances[0].stop).toHaveBeenCalledTimes(1);
     expect(mockState.orbitInstances[0].dispose).toHaveBeenCalledTimes(1);
     expect(mockState.pinchInstances[0].dispose).toHaveBeenCalledTimes(1);
+    expect(lifecycle.scene.remove).toHaveBeenCalledWith(globe);
+    expect(globe.dispose).toHaveBeenCalledTimes(1);
     expect(lifecycle.dispose).toHaveBeenCalledTimes(1);
   });
 

@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildFlagPrompts, pickRandomFlagPrompt, type QuizCountry, type QuizFlagPrompt } from "./pickRandomFlagPrompt";
+import {
+  buildFlagPrompts,
+  pickNextFlagPrompt,
+  pickRandomFlagPrompt,
+  type QuizCountry,
+  type QuizFlagPrompt
+} from "./pickRandomFlagPrompt";
 
 function makeCountry(isoAlpha2: string): QuizCountry {
   return {
@@ -54,5 +60,39 @@ describe("pickRandomFlagPrompt", () => {
     vi.spyOn(Math, "random").mockReturnValue(random);
 
     expect(pickRandomFlagPrompt(prompts).flagCode).toBe(expected);
+  });
+});
+
+describe("pickNextFlagPrompt", () => {
+  const prompts: QuizFlagPrompt[] = [
+    { flagCode: "A", countries: [makeCountry("AA")] },
+    { flagCode: "B", countries: [makeCountry("BB")] },
+    { flagCode: "C", countries: [makeCountry("CC")] }
+  ];
+
+  it("uses an injected rng for deterministic prompt selection", () => {
+    expect(pickNextFlagPrompt(prompts, { rng: () => 0.67 })?.flagCode).toBe("C");
+  });
+
+  it("does not immediately repeat the previous prompt when alternatives exist", () => {
+    const prompt = pickNextFlagPrompt(prompts, {
+      previousPrompt: prompts[0],
+      rng: () => 0
+    });
+
+    expect(prompt?.flagCode).toBe("B");
+  });
+
+  it("returns the only prompt for a single-prompt dataset", () => {
+    const prompt = pickNextFlagPrompt([prompts[0]], {
+      previousPrompt: prompts[0],
+      rng: () => 0
+    });
+
+    expect(prompt).toBe(prompts[0]);
+  });
+
+  it("returns null for an empty prompt list", () => {
+    expect(pickNextFlagPrompt([])).toBeNull();
   });
 });

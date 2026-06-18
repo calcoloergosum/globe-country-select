@@ -24,6 +24,10 @@ type PreparedPolygon = {
   holes: PreparedRing[];
 };
 
+type SphericalSurfacePolygonFinderOptions = {
+  enableProximity?: boolean;
+};
+
 const LAT_MIN = -90;
 const LAT_MAX = 90;
 const LNG_MIN = -180;
@@ -37,8 +41,10 @@ const PROXIMITY_MIN_VOTES = 2;
 export class SphericalSurfacePolygonFinder {
   private readonly polygons: PreparedPolygon[] = [];
   private readonly spatialIndex = new RBush<BoundingBoxItem>();
+  private readonly enableProximity: boolean;
 
-  constructor(countries: CountryFeature[]) {
+  constructor(countries: CountryFeature[], options: SphericalSurfacePolygonFinderOptions = {}) {
+    this.enableProximity = options.enableProximity ?? true;
     const items: BoundingBoxItem[] = [];
 
     for (const country of countries) {
@@ -87,6 +93,10 @@ export class SphericalSurfacePolygonFinder {
 
     if (exactMatch) {
       return exactMatch;
+    }
+
+    if (!this.enableProximity) {
+      return null;
     }
 
     return this.findNearbyCountry(queryLat, queryLng);

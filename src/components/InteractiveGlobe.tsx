@@ -22,6 +22,7 @@ type InteractiveGlobeProps = {
   clearSelectionSignal?: number;
   focusLatLng?: { lat: number; lng: number };
   focusCountry?: CountryFeature;
+  enableProximityPicking?: boolean;
   onPointHover?: (point: GlobeEventData | null) => void;
   onPointClick?: (point: GlobeEventData | null) => void;
 };
@@ -37,17 +38,22 @@ export function InteractiveGlobe({
   clearSelectionSignal,
   focusLatLng,
   focusCountry,
+  enableProximityPicking = true,
   onPointHover,
   onPointClick
 }: InteractiveGlobeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const polygonFinder = useMemo(() => new SphericalSurfacePolygonFinder(countries), [countries]);
+  const polygonFinder = useMemo(
+    () => new SphericalSurfacePolygonFinder(countries, { enableProximity: enableProximityPicking }),
+    [countries, enableProximityPicking]
+  );
   const onPointHoverRef = useRef(onPointHover);
   const onPointClickRef = useRef(onPointClick);
   const pinnedIsoRef = useRef(pinnedCountryIsoA2);
   const selectedCountryRef = useRef<CountryFeature | null>(null);
   const highlightOnHoverRef = useRef(highlightOnHover);
   const applyStylesRef = useRef<(() => void) | null>(null);
+  const requestRenderRef = useRef<(() => void) | null>(null);
   const focusTargetRef = useRef<{ lat: number; lng: number; zoomDistance?: number } | null>(null);
 
   useEffect(() => {
@@ -76,6 +82,7 @@ export function InteractiveGlobe({
   useEffect(() => {
     if (!focusLatLng) {
       focusTargetRef.current = null;
+      requestRenderRef.current?.();
       return;
     }
 
@@ -84,6 +91,7 @@ export function InteractiveGlobe({
       lng: focusLatLng.lng,
       zoomDistance: focusCountry ? getFitDistanceForCountry(focusCountry) : undefined
     };
+    requestRenderRef.current?.();
   }, [focusCountry, focusLatLng]);
 
   useEffect(() => {
@@ -92,7 +100,8 @@ export function InteractiveGlobe({
       return;
     }
 
-    const globe = new Globe().polygonsData(countries);
+    const requestRender = () => requestRenderRef.current?.();
+    const globe = new Globe({ requestRender }).polygonsData(countries);
 
     if (globeImageUrl) {
       globe.globeImageUrl(globeImageUrl);
@@ -114,7 +123,8 @@ export function InteractiveGlobe({
         container,
         minCameraDistance,
         maxCameraDistance,
-        initialCameraDistance: DEFAULT_CAMERA_DISTANCE
+        initialCameraDistance: DEFAULT_CAMERA_DISTANCE,
+        onResize: requestRender
       });
     let hoveredCountry: CountryFeature | null = null;
     let rotationLatitude = 0;
@@ -160,7 +170,6 @@ export function InteractiveGlobe({
     };
 
 
-    // Hover/click logic now handled via OrbitControl callbacks
     const handleHover = (clientX: number, clientY: number, _event: PointerEvent) => {
       if (!highlightOnHoverRef.current && !onPointHoverRef.current) return;
       emitHover(pickCountryAtClientPoint(clientX, clientY));
@@ -187,10 +196,9 @@ export function InteractiveGlobe({
       updateGlobeRotation();
       camera.position.set(0, 0, DEFAULT_CAMERA_DISTANCE);
       controls.update();
+      requestRender();
     };
 
-
-    // pointermove/click now handled by OrbitControl
 
     orbitControl = new OrbitControl({
       domElement: renderer.domElement,
@@ -215,6 +223,7 @@ export function InteractiveGlobe({
         rotationLatitude = latitude;
         rotationLongitude = longitude;
         updateGlobeRotation();
+        requestRender();
       },
       onHover: handleHover,
       onClick: handleClick
@@ -238,7 +247,8 @@ export function InteractiveGlobe({
         updateGlobeRotation();
       },
       intersectGlobeAtClientPoint,
-      cancelActiveDrag: () => orbitControl?.cancelActiveDrag()
+      cancelActiveDrag: () => orbitControl?.cancelActiveDrag(),
+      onChange: requestRender
     });
     pinchController.attach();
 
@@ -262,15 +272,20 @@ export function InteractiveGlobe({
         rotationLatitude = latitude;
         rotationLongitude = longitude;
         updateGlobeRotation();
+        requestRender();
       },
       getFocusTarget: () => focusTargetRef.current
     });
+    requestRenderRef.current = renderLoopController.requestRender;
     renderLoopController.start();
 
     return () => {
+      requestRenderRef.current = null;
       renderLoopController.stop();
       orbitControl?.dispose();
       pinchController.dispose();
+      scene.remove(globe);
+      globe.dispose();
       disposeSceneLifecycle();
     };
   }, [bumpImageUrl, countries, globeImageUrl, polygonFinder]);

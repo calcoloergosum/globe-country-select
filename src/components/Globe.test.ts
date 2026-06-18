@@ -27,6 +27,30 @@ afterEach(() => {
 });
 
 describe("Globe", () => {
+  it("disposes a late globe texture callback after dispose without attaching it", () => {
+    let loadCallback: ((texture: THREE.Texture) => void) | undefined;
+    vi.spyOn(THREE.TextureLoader.prototype, "load").mockImplementation(
+      (_url: string, onLoad?: (texture: THREE.Texture) => void) => {
+        loadCallback = onLoad;
+        return {} as THREE.Texture;
+      }
+    );
+
+    const globe = new Globe();
+    const globeMesh = globe.children[0] as THREE.Mesh;
+    const material = globeMesh.material as THREE.MeshPhongMaterial;
+
+    globe.globeImageUrl("earth");
+    globe.dispose();
+
+    const lateTexture = new THREE.Texture();
+    const lateDisposeSpy = vi.spyOn(lateTexture, "dispose");
+    loadCallback?.(lateTexture);
+
+    expect(lateDisposeSpy).toHaveBeenCalledTimes(1);
+    expect(material.map).toBeNull();
+  });
+
   it("drops stale globe texture requests and disposes replaced textures", () => {
     const loadCallbacks: Array<(texture: THREE.Texture) => void> = [];
     vi.spyOn(THREE.TextureLoader.prototype, "load").mockImplementation(

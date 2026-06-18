@@ -31,6 +31,7 @@ type FocusStepOutput = {
   rotationLatitude: number;
   rotationLongitude: number;
   cameraDistance: number;
+  isActive: boolean;
 };
 
 function lerpAngle(a: number, b: number, t: number) {
@@ -67,7 +68,8 @@ export function createFocusTransitionController() {
         return {
           rotationLatitude,
           rotationLongitude,
-          cameraDistance
+          cameraDistance,
+          isActive: false
         };
       }
 
@@ -103,6 +105,7 @@ export function createFocusTransitionController() {
       const rotationLerpFactor = toDeltaLerpFactor(0.08, deltaSeconds);
       const nextLat = lerpAngle(rotationLatitude, targetLat, rotationLerpFactor);
       const nextLng = lerpAngle(rotationLongitude, targetLng, rotationLerpFactor);
+      let didMove = false;
 
       if (
         Math.abs(nextLat - rotationLatitude) > 0.0001 ||
@@ -110,6 +113,7 @@ export function createFocusTransitionController() {
       ) {
         rotationLatitude = nextLat;
         rotationLongitude = nextLng;
+        didMove = true;
       }
 
       if (activeFocusTransition?.signature === focusSignature) {
@@ -122,6 +126,7 @@ export function createFocusTransitionController() {
           );
           if (Math.abs(nextDistance - cameraDistance) > 0.05) {
             cameraDistance = nextDistance;
+            didMove = true;
           }
 
           if (Math.abs(activeFocusTransition.zoomOutDistance - nextDistance) <= 0.6) {
@@ -136,6 +141,7 @@ export function createFocusTransitionController() {
           );
           if (Math.abs(nextDistance - cameraDistance) > 0.05) {
             cameraDistance = nextDistance;
+            didMove = true;
           }
 
           if (Math.abs(activeFocusTransition.desiredDistance - nextDistance) <= 0.6) {
@@ -147,7 +153,8 @@ export function createFocusTransitionController() {
       return {
         rotationLatitude,
         rotationLongitude,
-        cameraDistance
+        cameraDistance,
+        isActive: didMove || activeFocusTransition !== null
       };
     }
   };
