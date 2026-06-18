@@ -67,9 +67,11 @@ describe("MainPage", () => {
 
     fireEvent.click(screen.getByText("emit-hover"));
     expect(screen.queryByText("France (FR)")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Flag of France (FR)" })).not.toBeNull();
 
     fireEvent.click(screen.getByText("emit-click"));
     expect(screen.queryByText("United States (US)")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Flag of United States (US)" })).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Quiz" }));
     expect(onNavigate).toHaveBeenCalledWith("quiz");

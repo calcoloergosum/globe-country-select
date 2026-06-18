@@ -21,6 +21,51 @@ afterEach(() => {
 });
 
 describe("createRenderLoopController", () => {
+  function stubDocumentVisibility(initialVisibilityState: DocumentVisibilityState) {
+    let visibilityState = initialVisibilityState;
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    const addEventListener = vi.fn(
+      (type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "visibilitychange") {
+          listeners.add(listener);
+        }
+      }
+    );
+    const removeEventListener = vi.fn(
+      (type: string, listener: EventListenerOrEventListenerObject) => {
+        if (type === "visibilitychange") {
+          listeners.delete(listener);
+        }
+      }
+    );
+    const documentStub = {
+      get visibilityState() {
+        return visibilityState;
+      },
+      addEventListener,
+      removeEventListener
+    };
+
+    vi.stubGlobal("document", documentStub);
+
+    return {
+      addEventListener,
+      removeEventListener,
+      setVisibilityState(nextVisibilityState: DocumentVisibilityState) {
+        visibilityState = nextVisibilityState;
+      },
+      dispatchVisibilityChange() {
+        for (const listener of Array.from(listeners)) {
+          if (typeof listener === "function") {
+            listener({ type: "visibilitychange" } as Event);
+          } else {
+            listener.handleEvent({ type: "visibilitychange" } as Event);
+          }
+        }
+      }
+    };
+  }
+
   function setupRenderLoop({
     focusActive = false,
     controlsChanged = false
@@ -176,5 +221,46 @@ describe("createRenderLoopController", () => {
     expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
     expect(cancelAnimationFrame).toHaveBeenCalledTimes(1);
     expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+  });
+
+  it("preserves a pending render request while hidden and schedules it after becoming visible", () => {
+    const visibility = stubDocumentVisibility("hidden");
+    const { controller, renderer, runNextFrame } = setupRenderLoop();
+
+    controller.start();
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(runNextFrame()).toBe(false);
+    expect(renderer.render).not.toHaveBeenCalled();
+
+    visibility.setVisibilityState("visible");
+    visibility.dispatchVisibilityChange();
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(runNextFrame()).toBe(true);
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it("stop removes the visibility listener and cancels pending scheduled work", () => {
+    const visibility = stubDocumentVisibility("visible");
+    const { controller, runNextFrame } = setupRenderLoop();
+
+    controller.start();
+    controller.stop();
+
+    expect(visibility.addEventListener).toHaveBeenCalledWith(
+      "visibilitychange",
+      expect.any(Function)
+    );
+    expect(visibility.removeEventListener).toHaveBeenCalledWith(
+      "visibilitychange",
+      expect.any(Function)
+    );
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+
+    visibility.dispatchVisibilityChange();
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(runNextFrame()).toBe(false);
   });
 });

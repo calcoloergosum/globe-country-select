@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   buildFlagPrompts,
@@ -42,24 +42,22 @@ describe("buildFlagPrompts", () => {
 });
 
 describe("pickRandomFlagPrompt", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it.each([
     { random: 0, expected: "A" },
     { random: 0.34, expected: "B" },
     { random: 0.999, expected: "C" }
-  ])("selects prompt $expected for Math.random()=$random", ({ random, expected }) => {
+  ])("selects prompt $expected for rng()=$random", ({ random, expected }) => {
     const prompts: QuizFlagPrompt[] = [
       { flagCode: "A", countries: [makeCountry("AA")] },
       { flagCode: "B", countries: [makeCountry("BB")] },
       { flagCode: "C", countries: [makeCountry("CC")] }
     ];
 
-    vi.spyOn(Math, "random").mockReturnValue(random);
+    expect(pickRandomFlagPrompt(prompts, () => random)?.flagCode).toBe(expected);
+  });
 
-    expect(pickRandomFlagPrompt(prompts).flagCode).toBe(expected);
+  it("returns null for an empty prompt list", () => {
+    expect(pickRandomFlagPrompt([])).toBeNull();
   });
 });
 

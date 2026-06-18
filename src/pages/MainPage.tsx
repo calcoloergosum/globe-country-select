@@ -16,7 +16,7 @@ function CountryLabel({ data }: { data: GlobeEventData | null }) {
   return (
     <div className="main-country-label">
       {data ? (
-        <CountryFlag code={data.isoAlpha2} className="main-country-flag" />
+        <CountryFlag code={data.isoAlpha2} className="main-country-flag" ariaLabel={`Flag of ${data.label}`} />
       ) : (
         <div className="main-country-flag main-country-flag-placeholder" aria-hidden="true" />
       )}

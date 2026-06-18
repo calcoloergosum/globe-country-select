@@ -59,7 +59,7 @@ export function QuizOverlay({
           <p className="quiz-description">Preparing quiz...</p>
         ) : (
           <>
-            <CountryFlag code={currentPrompt.flagCode} className="quiz-flag" />
+            <CountryFlag code={currentPrompt.flagCode} className="quiz-flag" ariaLabel="Flag to identify" />
 
             {result === null && (
               <>

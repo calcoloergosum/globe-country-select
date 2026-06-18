@@ -4,9 +4,20 @@ import { hasFlagIcon } from "../utils/flagIcons";
 
 type CountryFlagProps = Omit<HTMLAttributes<HTMLSpanElement>, "children"> & {
   code?: string | null;
+  decorative?: boolean;
+  ariaLabel?: string;
 };
 
-export function CountryFlag({ code, className, ...spanProps }: CountryFlagProps) {
+export function CountryFlag({
+  code,
+  className,
+  decorative,
+  ariaLabel,
+  role,
+  "aria-label": spanAriaLabel,
+  "aria-hidden": spanAriaHidden,
+  ...spanProps
+}: CountryFlagProps) {
   const normalizedCode = code?.trim().toUpperCase();
   if (!normalizedCode) {
     return null;
@@ -18,6 +29,13 @@ export function CountryFlag({ code, className, ...spanProps }: CountryFlagProps)
 
   const iconClassName = `fi fi-${normalizedCode.toLowerCase()}`;
   const mergedClassName = className ? `${iconClassName} ${className}` : iconClassName;
+  const accessibilityProps = decorative
+    ? { "aria-hidden": true }
+    : {
+        role: ariaLabel ? "img" : role,
+        "aria-label": ariaLabel ?? spanAriaLabel,
+        "aria-hidden": spanAriaHidden
+      };
 
-  return <span {...spanProps} className={mergedClassName} />;
+  return <span {...spanProps} {...accessibilityProps} className={mergedClassName} />;
 }

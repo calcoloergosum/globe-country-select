@@ -92,6 +92,8 @@ describe("QuizOverlay", () => {
 
     const submitButton = view.getByRole("button", { name: "Submit" });
     expect((submitButton as HTMLButtonElement).disabled).toBe(true);
+    expect(view.getByRole("img", { name: "Flag to identify" })).not.toBeNull();
+    expect(view.queryByRole("img", { name: /France/i })).toBeNull();
 
     fireEvent.click(view.getByRole("button", { name: "Skip" }));
     fireEvent.click(view.getByRole("button", { name: "Show Answer" }));

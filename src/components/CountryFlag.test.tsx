@@ -41,4 +41,33 @@ describe("CountryFlag", () => {
     expect(span?.className).toContain("quiz-flag");
     expect(span?.getAttribute("aria-label")).toBe("country-flag");
   });
+
+  it("renders an image role and accessible label when ariaLabel is provided", () => {
+    hasFlagIconMock.mockReturnValue(true);
+    const { container } = render(<CountryFlag code="fr" ariaLabel="Flag of France" />);
+
+    const span = container.querySelector("span");
+    expect(span?.getAttribute("role")).toBe("img");
+    expect(span?.getAttribute("aria-label")).toBe("Flag of France");
+    expect(span?.hasAttribute("aria-hidden")).toBe(false);
+  });
+
+  it("renders decorative flags as hidden from assistive technology", () => {
+    hasFlagIconMock.mockReturnValue(true);
+    const { container } = render(<CountryFlag code="fr" decorative />);
+
+    const span = container.querySelector("span");
+    expect(span?.getAttribute("aria-hidden")).toBe("true");
+    expect(span?.hasAttribute("role")).toBe(false);
+  });
+
+  it("lets decorative flags win over ariaLabel", () => {
+    hasFlagIconMock.mockReturnValue(true);
+    const { container } = render(<CountryFlag code="fr" decorative ariaLabel="Flag of France" />);
+
+    const span = container.querySelector("span");
+    expect(span?.getAttribute("aria-hidden")).toBe("true");
+    expect(span?.hasAttribute("role")).toBe(false);
+    expect(span?.hasAttribute("aria-label")).toBe(false);
+  });
 });

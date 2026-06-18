@@ -57,7 +57,9 @@ export function buildFlagPrompts<TFeature>(countries: QuizCountry<TFeature>[]): 
 export function pickRandomFlagPrompt<TFeature>(
   prompts: QuizFlagPrompt<TFeature>[],
   rng: () => number = Math.random
-): QuizFlagPrompt<TFeature> {
+): QuizFlagPrompt<TFeature> | null {
+  if (prompts.length === 0) return null;
+
   const index = Math.min(Math.floor(rng() * prompts.length), prompts.length - 1);
   return prompts[index];
 }
