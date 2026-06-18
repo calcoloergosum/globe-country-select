@@ -27,6 +27,10 @@ const mockState = vi.hoisted(() => ({
     cancelActiveDrag: ReturnType<typeof vi.fn>;
   }>,
   pinchInstances: [] as Array<{
+    options: {
+      minCameraDistance: number;
+      maxCameraDistance: number;
+    };
     attach: ReturnType<typeof vi.fn>;
     dispose: ReturnType<typeof vi.fn>;
   }>,
@@ -37,6 +41,8 @@ const mockState = vi.hoisted(() => ({
     invalidate: ReturnType<typeof vi.fn>;
   }>,
   renderLoopDeps: [] as Array<{
+    minCameraDistance: number;
+    maxCameraDistance: number;
     getFocusTarget: () => { lat: number; lng: number; zoomDistance?: number } | null;
   }>,
   sceneLifecycleReturns: [] as Array<{
@@ -58,6 +64,8 @@ const mockState = vi.hoisted(() => ({
 }));
 
 vi.mock("./Globe", () => ({
+  DEFAULT_GLOBE_RADIUS: 100,
+  STROKE_ALTITUDE_OFFSET: 0.0012,
   default: class Globe {
     quaternion = new THREE.Quaternion();
     polygonsData = vi.fn(() => this);
@@ -151,6 +159,7 @@ vi.mock("./interactiveGlobe/picking", () => ({
 }));
 
 vi.mock("./interactiveGlobe/polygonStyling", () => ({
+  ACTIVE_POLYGON_ALTITUDE: 0.0003,
   createPolygonStyleApplicator: vi.fn(() => {
     const applyStyle = vi.fn();
     mockState.applyStyleFns.push(applyStyle);
@@ -159,8 +168,9 @@ vi.mock("./interactiveGlobe/polygonStyling", () => ({
 }));
 
 vi.mock("./interactiveGlobe/pinchZoom", () => ({
-  createPinchGestureController: vi.fn(() => {
+  createPinchGestureController: vi.fn((options: { minCameraDistance: number; maxCameraDistance: number }) => {
     const controller = {
+      options,
       attach: vi.fn(),
       dispose: vi.fn()
     };
@@ -170,7 +180,11 @@ vi.mock("./interactiveGlobe/pinchZoom", () => ({
 }));
 
 vi.mock("./interactiveGlobe/renderLoop", () => ({
-  createRenderLoopController: vi.fn((deps: { getFocusTarget: () => { lat: number; lng: number; zoomDistance?: number } | null }) => {
+  createRenderLoopController: vi.fn((deps: {
+    minCameraDistance: number;
+    maxCameraDistance: number;
+    getFocusTarget: () => { lat: number; lng: number; zoomDistance?: number } | null;
+  }) => {
     mockState.renderLoopDeps.push(deps);
     const controller = {
       start: vi.fn(),
@@ -183,7 +197,16 @@ vi.mock("./interactiveGlobe/renderLoop", () => ({
   })
 }));
 
+import { DEFAULT_GLOBE_RADIUS, STROKE_ALTITUDE_OFFSET } from "./Globe";
 import { InteractiveGlobe, type CountryFeature } from "./InteractiveGlobe";
+import {
+  DEFAULT_GLOBE_CAMERA_DISTANCE,
+  GLOBE_CAMERA_NEAR,
+  MAX_GLOBE_CAMERA_DISTANCE,
+  MIN_GLOBE_SURFACE_CLEARANCE,
+  getMinGlobeCameraDistance
+} from "./interactiveGlobe/cameraConfig";
+import { ACTIVE_POLYGON_ALTITUDE } from "./interactiveGlobe/polygonStyling";
 
 function makeCountryFeature(name: string, isoAlpha2: string): CountryFeature {
   return {
@@ -231,10 +254,25 @@ describe("InteractiveGlobe", () => {
     expect(globe.globeImageUrl).toHaveBeenCalledWith("earth.jpg");
     expect(globe.bumpImageUrl).toHaveBeenCalledWith("bump.jpg");
 
-    expect(lifecycle.options.minCameraDistance).toBeCloseTo(100.1, 6);
-    expect(lifecycle.options.maxCameraDistance).toBe(540);
-    expect(lifecycle.options.initialCameraDistance).toBe(320);
+    const expectedMinCameraDistance = getMinGlobeCameraDistance(DEFAULT_GLOBE_RADIUS);
+    const maximumOverlayRadius =
+      DEFAULT_GLOBE_RADIUS * (1 + ACTIVE_POLYGON_ALTITUDE + STROKE_ALTITUDE_OFFSET);
+
+    expect(lifecycle.options.minCameraDistance).toBe(expectedMinCameraDistance);
+    expect(lifecycle.options.minCameraDistance).not.toBeCloseTo(DEFAULT_GLOBE_RADIUS + 0.1, 6);
+    expect(lifecycle.options.minCameraDistance - DEFAULT_GLOBE_RADIUS).toBe(MIN_GLOBE_SURFACE_CLEARANCE);
+    // Mesh-sphere close zoom clips when the near plane intersects the globe surface.
+    expect(lifecycle.options.minCameraDistance - DEFAULT_GLOBE_RADIUS).toBeGreaterThan(
+      GLOBE_CAMERA_NEAR * 20
+    );
+    expect(lifecycle.options.minCameraDistance).toBeGreaterThan(maximumOverlayRadius);
+    expect(lifecycle.options.maxCameraDistance).toBe(MAX_GLOBE_CAMERA_DISTANCE);
+    expect(lifecycle.options.initialCameraDistance).toBe(DEFAULT_GLOBE_CAMERA_DISTANCE);
     expect(lifecycle.scene.add).toHaveBeenCalledWith(globe);
+    expect(mockState.pinchInstances[0].options.minCameraDistance).toBe(expectedMinCameraDistance);
+    expect(mockState.pinchInstances[0].options.maxCameraDistance).toBe(MAX_GLOBE_CAMERA_DISTANCE);
+    expect(mockState.renderLoopDeps[0].minCameraDistance).toBe(expectedMinCameraDistance);
+    expect(mockState.renderLoopDeps[0].maxCameraDistance).toBe(MAX_GLOBE_CAMERA_DISTANCE);
 
     expect(mockState.orbitInstances[0].attach).toHaveBeenCalledTimes(1);
     expect(mockState.pinchInstances[0].attach).toHaveBeenCalledTimes(1);
@@ -320,7 +358,9 @@ describe("InteractiveGlobe", () => {
 
     const focusTargetBeforeDrag = renderLoopDeps.getFocusTarget();
     expect(focusTargetBeforeDrag).toMatchObject({ lat: 48.8, lng: 2.3 });
-    expect(focusTargetBeforeDrag?.zoomDistance).toBeGreaterThanOrEqual(120);
+    expect(focusTargetBeforeDrag?.zoomDistance).toBeGreaterThanOrEqual(
+      getMinGlobeCameraDistance(DEFAULT_GLOBE_RADIUS)
+    );
     expect(focusTargetBeforeDrag?.zoomDistance).toBeLessThanOrEqual(480);
 
     act(() => {
@@ -347,7 +387,11 @@ describe("InteractiveGlobe", () => {
 
     expect(lifecycle.camera.position.x).toBe(0);
     expect(lifecycle.camera.position.y).toBe(0);
-    expect(lifecycle.camera.position.z).toBe(320);
+    expect(lifecycle.camera.position.z).toBe(DEFAULT_GLOBE_CAMERA_DISTANCE);
+    expect(lifecycle.camera.position.z).toBeGreaterThanOrEqual(
+      getMinGlobeCameraDistance(DEFAULT_GLOBE_RADIUS)
+    );
+    expect(lifecycle.camera.position.z).toBeLessThanOrEqual(MAX_GLOBE_CAMERA_DISTANCE);
     expect(lifecycle.controls.update).toHaveBeenCalledTimes(1);
   });
 

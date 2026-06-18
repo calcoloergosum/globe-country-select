@@ -11,8 +11,8 @@ type PolygonStyleRefs = {
   getHoveredCountry: () => CountryFeature | null;
 };
 
-const BASE_POLYGON_ALTITUDE = 0.0002;
-const ACTIVE_POLYGON_ALTITUDE = 0.0003;
+export const BASE_POLYGON_ALTITUDE = 0.0002;
+export const ACTIVE_POLYGON_ALTITUDE = 0.0003;
 const BASE_POLYGON_CAP_COLOR = "rgba(0, 0, 0, 0)";
 const BASE_POLYGON_SIDE_COLOR = "rgba(0, 0, 0, 0)";
 const BASE_POLYGON_STROKE_COLOR = "rgba(0, 0, 0, 0)";

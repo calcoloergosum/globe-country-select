@@ -1,7 +1,7 @@
 // Main integration layer for renderer, controls, picking, highlighting, quiz focus camera behavior.
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import Globe from "./Globe";
+import Globe, { DEFAULT_GLOBE_RADIUS } from "./Globe";
 import type { CountryFeature, GlobeEventData } from "./globeTypes";
 import { OrbitControl } from "./OrbitControl";
 import { SphericalSurfacePolygonFinder } from "./SphericalSurfacePolygonFinder";
@@ -10,6 +10,11 @@ import { createRenderLoopController } from "./interactiveGlobe/renderLoop";
 import { createSceneLifecycle } from "./interactiveGlobe/sceneLifecycle";
 import { createGlobePicker, toGlobeEventData } from "./interactiveGlobe/picking";
 import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling";
+import {
+  DEFAULT_GLOBE_CAMERA_DISTANCE,
+  MAX_GLOBE_CAMERA_DISTANCE,
+  getMinGlobeCameraDistance
+} from "./interactiveGlobe/cameraConfig";
 
 export type { CountryFeature, GlobeEventData } from "./globeTypes";
 
@@ -26,8 +31,6 @@ type InteractiveGlobeProps = {
   onPointHover?: (point: GlobeEventData | null) => void;
   onPointClick?: (point: GlobeEventData | null) => void;
 };
-
-const DEFAULT_CAMERA_DISTANCE = 320;
 
 export function InteractiveGlobe({
   countries = [],
@@ -116,14 +119,14 @@ export function InteractiveGlobe({
     const longitudeRotation = new THREE.Quaternion();
     const latitudeRotation = new THREE.Quaternion();
     const maxLatitudeRotation = THREE.MathUtils.degToRad(89.5);
-    const minCameraDistance = globe.getGlobeRadius() + 0.1;
-    const maxCameraDistance = 540;
+    const minCameraDistance = getMinGlobeCameraDistance(globe.getGlobeRadius());
+    const maxCameraDistance = MAX_GLOBE_CAMERA_DISTANCE;
     const { scene, camera, renderer, controls, dispose: disposeSceneLifecycle } =
       createSceneLifecycle({
         container,
         minCameraDistance,
         maxCameraDistance,
-        initialCameraDistance: DEFAULT_CAMERA_DISTANCE,
+        initialCameraDistance: DEFAULT_GLOBE_CAMERA_DISTANCE,
         onResize: requestRender
       });
     let hoveredCountry: CountryFeature | null = null;
@@ -194,7 +197,7 @@ export function InteractiveGlobe({
       rotationLatitude = 0;
       rotationLongitude = 0;
       updateGlobeRotation();
-      camera.position.set(0, 0, DEFAULT_CAMERA_DISTANCE);
+      camera.position.set(0, 0, DEFAULT_GLOBE_CAMERA_DISTANCE);
       controls.update();
       requestRender();
     };
@@ -305,7 +308,7 @@ function getFitDistanceForCountry(country: CountryFeature) {
   const halfHorizontal = halfHorizontalRaw * Math.max(Math.cos(centerLat), 0.1);
   const angularRadius = Math.max(Math.hypot(halfVertical, halfHorizontal), THREE.MathUtils.degToRad(0.6));
 
-  const globeRadius = 100;
+  const globeRadius = DEFAULT_GLOBE_RADIUS;
   const fovY = THREE.MathUtils.degToRad(45);
   const marginFactor = 0.72;
   const tangent = Math.tan(fovY / 2) * marginFactor;

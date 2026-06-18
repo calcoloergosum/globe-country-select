@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type Globe from "../Globe";
 import type { CountryFeature } from "../globeTypes";
-import { createPolygonStyleApplicator } from "./polygonStyling";
+import {
+  ACTIVE_POLYGON_ALTITUDE,
+  BASE_POLYGON_ALTITUDE,
+  createPolygonStyleApplicator
+} from "./polygonStyling";
 
 function makeCountry(isoAlpha2: string): CountryFeature {
   return {
@@ -71,10 +75,10 @@ describe("createPolygonStyleApplicator", () => {
     expect(accessors.side).toBeTypeOf("function");
     expect(accessors.stroke).toBeTypeOf("function");
 
-    expect(accessors.altitude?.(pinnedCountry)).toBe(0.0003);
+    expect(accessors.altitude?.(pinnedCountry)).toBe(ACTIVE_POLYGON_ALTITUDE);
     expect(accessors.cap?.(pinnedCountry)).toBe("rgba(255, 200, 0, 0.92)");
 
-    expect(accessors.altitude?.(selectedCountry)).toBe(0.0003);
+    expect(accessors.altitude?.(selectedCountry)).toBe(ACTIVE_POLYGON_ALTITUDE);
     expect(accessors.cap?.(selectedCountry)).toBe("rgba(231, 76, 60, 0.95)");
     expect(accessors.side?.(selectedCountry)).toBe("rgba(192, 57, 43, 0.26)");
     expect(accessors.stroke?.(selectedCountry)).toBe("rgba(120, 18, 13, 0.9)");
@@ -93,7 +97,7 @@ describe("createPolygonStyleApplicator", () => {
 
     apply();
 
-    expect(accessors.altitude?.(hoveredCountry)).toBe(0.0002);
+    expect(accessors.altitude?.(hoveredCountry)).toBe(BASE_POLYGON_ALTITUDE);
     expect(accessors.cap?.(hoveredCountry)).toBe("rgba(0, 0, 0, 0)");
     expect(accessors.side?.(hoveredCountry)).toBe("rgba(0, 0, 0, 0)");
     expect(accessors.stroke?.(hoveredCountry)).toBe("rgba(0, 0, 0, 0)");

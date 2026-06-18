@@ -12,7 +12,12 @@ vi.mock("./focusTransition", () => ({
 }));
 
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { MAX_GLOBE_CAMERA_DISTANCE, getMinGlobeCameraDistance } from "./cameraConfig";
 import { createRenderLoopController } from "./renderLoop";
+
+const TEST_GLOBE_RADIUS = 100;
+const TEST_MIN_CAMERA_DISTANCE = getMinGlobeCameraDistance(TEST_GLOBE_RADIUS);
+const TEST_MAX_CAMERA_DISTANCE = MAX_GLOBE_CAMERA_DISTANCE;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -120,8 +125,8 @@ describe("createRenderLoopController", () => {
       renderer,
       controls,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE,
       getRotation,
       setRotation,
       getFocusTarget

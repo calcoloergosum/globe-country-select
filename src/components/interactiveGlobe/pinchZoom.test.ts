@@ -19,9 +19,13 @@ vi.mock("../../utils/interaction", async () => {
 });
 
 import type Globe from "../Globe";
+import { MAX_GLOBE_CAMERA_DISTANCE, getMinGlobeCameraDistance } from "./cameraConfig";
 import { createPinchGestureController } from "./pinchZoom";
 
 type Listener = (event: Event) => void;
+const TEST_GLOBE_RADIUS = 100;
+const TEST_MIN_CAMERA_DISTANCE = getMinGlobeCameraDistance(TEST_GLOBE_RADIUS);
+const TEST_MAX_CAMERA_DISTANCE = MAX_GLOBE_CAMERA_DISTANCE;
 
 function createDomElementMock() {
   const listeners = new Map<string, Listener[]>();
@@ -110,8 +114,8 @@ describe("createPinchGestureController", () => {
       globe,
       camera,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE,
       getRotation: () => ({ latitude: 0, longitude: 0 }),
       setRotation,
       intersectGlobeAtClientPoint,
@@ -176,8 +180,8 @@ describe("createPinchGestureController", () => {
       globe,
       camera,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE,
       getRotation: () => ({ latitude: 0, longitude: 0 }),
       setRotation,
       intersectGlobeAtClientPoint
@@ -206,7 +210,7 @@ describe("createPinchGestureController", () => {
     expect(removeRollFromRotationMock).toHaveBeenCalledTimes(1);
     expect(setRotation).toHaveBeenCalledTimes(1);
     expect(camera.position.length()).toBeGreaterThan(200);
-    expect(camera.position.length()).toBeLessThanOrEqual(420);
+    expect(camera.position.length()).toBeLessThanOrEqual(TEST_MAX_CAMERA_DISTANCE);
   });
 
   it("resets active pinch state when touch count drops and does not process further moves", () => {
@@ -218,8 +222,8 @@ describe("createPinchGestureController", () => {
       globe: { quaternion: new THREE.Quaternion() } as Globe,
       camera: { position: new THREE.Vector3(0, 0, 160) } as THREE.PerspectiveCamera,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE,
       getRotation: () => ({ latitude: 0, longitude: 0 }),
       setRotation,
       intersectGlobeAtClientPoint: vi.fn((_x, _y, out) => out.set(0, 0, 1))
@@ -270,8 +274,8 @@ describe("createPinchGestureController", () => {
       globe: { quaternion: new THREE.Quaternion() } as Globe,
       camera,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE,
       getRotation: () => ({ latitude: 0, longitude: 0 }),
       setRotation: vi.fn(),
       intersectGlobeAtClientPoint: vi.fn((_x, _y, out) => out.set(0, 0, 1))

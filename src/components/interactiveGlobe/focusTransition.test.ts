@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { MAX_GLOBE_CAMERA_DISTANCE, getMinGlobeCameraDistance } from "./cameraConfig";
 import { createFocusTransitionController } from "./focusTransition";
+
+const TEST_GLOBE_RADIUS = 100;
+const TEST_MIN_CAMERA_DISTANCE = getMinGlobeCameraDistance(TEST_GLOBE_RADIUS);
+const TEST_MAX_CAMERA_DISTANCE = MAX_GLOBE_CAMERA_DISTANCE;
 
 describe("createFocusTransitionController", () => {
   it("returns the input state unchanged when there is no focus target", () => {
@@ -14,8 +19,8 @@ describe("createFocusTransitionController", () => {
       cameraDistance: 240,
       deltaSeconds: 1 / 60,
       maxLatitudeRotation: Math.PI / 2,
-      minCameraDistance: 120,
-      maxCameraDistance: 500
+      minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+      maxCameraDistance: TEST_MAX_CAMERA_DISTANCE
     });
 
     expect(next).toEqual({
@@ -48,8 +53,8 @@ describe("createFocusTransitionController", () => {
         cameraDistance: state.cameraDistance,
         deltaSeconds: 1 / 60,
         maxLatitudeRotation: THREE.MathUtils.degToRad(89.5),
-        minCameraDistance: 120,
-        maxCameraDistance: 420
+        minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
+        maxCameraDistance: TEST_MAX_CAMERA_DISTANCE
       });
 
       peakDistance = Math.max(peakDistance, state.cameraDistance);
@@ -84,12 +89,12 @@ describe("createFocusTransitionController", () => {
         cameraDistance: state.cameraDistance,
         deltaSeconds: 1 / 60,
         maxLatitudeRotation: Math.PI / 2,
-        minCameraDistance: 120,
+        minCameraDistance: TEST_MIN_CAMERA_DISTANCE,
         maxCameraDistance: 360
       });
     }
 
-    expect(state.cameraDistance).toBeGreaterThanOrEqual(119.5);
-    expect(state.cameraDistance).toBeLessThanOrEqual(122);
+    expect(state.cameraDistance).toBeGreaterThanOrEqual(TEST_MIN_CAMERA_DISTANCE - 0.5);
+    expect(state.cameraDistance).toBeLessThanOrEqual(TEST_MIN_CAMERA_DISTANCE + 2);
   });
 });

@@ -11,9 +11,9 @@ import {
 } from "./globe/styles";
 import type { ColorAccessor, NumericAccessor, PolygonVisual } from "./globe/types";
 
-const DEFAULT_GLOBE_RADIUS = 100;
+export const DEFAULT_GLOBE_RADIUS = 100;
 const DEFAULT_SEGMENTS = 64;
-const STROKE_ALTITUDE_OFFSET = 0.0012;
+export const STROKE_ALTITUDE_OFFSET = 0.0012;
 
 type GlobeOptions = {
   requestRender?: () => void;

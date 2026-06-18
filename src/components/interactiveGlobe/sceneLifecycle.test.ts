@@ -75,6 +75,12 @@ vi.mock("three", async () => {
   };
 });
 
+import {
+  GLOBE_CAMERA_FAR,
+  GLOBE_CAMERA_NEAR,
+  MAX_GLOBE_CAMERA_DISTANCE,
+  getMinGlobeCameraDistance
+} from "./cameraConfig";
 import { createSceneLifecycle } from "./sceneLifecycle";
 
 afterEach(() => {
@@ -152,8 +158,8 @@ describe("createSceneLifecycle", () => {
 
     const lifecycle = createSceneLifecycle({
       container,
-      minCameraDistance: 120,
-      maxCameraDistance: 420,
+      minCameraDistance: getMinGlobeCameraDistance(100),
+      maxCameraDistance: MAX_GLOBE_CAMERA_DISTANCE,
       initialCameraDistance: 260
     });
 
@@ -166,6 +172,8 @@ describe("createSceneLifecycle", () => {
     expect(renderer.setSize).toHaveBeenCalledWith(900, 560);
     expect(renderer.domElement.style.touchAction).toBe("none");
     expect(renderer.outputColorSpace).toBe(THREE.SRGBColorSpace);
+    expect(lifecycle.camera.near).toBe(GLOBE_CAMERA_NEAR);
+    expect(lifecycle.camera.far).toBe(GLOBE_CAMERA_FAR);
 
     expect(controls.enablePan).toBe(false);
     expect(controls.enableDamping).toBe(false);
@@ -173,8 +181,8 @@ describe("createSceneLifecycle", () => {
     expect(controls.enableRotate).toBe(false);
     expect(controls.zoomToCursor).toBe(false);
     expect(controls.zoomSpeed).toBe(1);
-    expect(controls.minDistance).toBe(120);
-    expect(controls.maxDistance).toBe(420);
+    expect(controls.minDistance).toBe(getMinGlobeCameraDistance(100));
+    expect(controls.maxDistance).toBe(MAX_GLOBE_CAMERA_DISTANCE);
 
     expect(observer.observe).toHaveBeenCalledWith(container);
     expect(windowMock.addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
@@ -247,8 +255,8 @@ describe("createSceneLifecycle", () => {
 
     const lifecycle = createSceneLifecycle({
       container,
-      minCameraDistance: 100,
-      maxCameraDistance: 500,
+      minCameraDistance: getMinGlobeCameraDistance(100),
+      maxCameraDistance: MAX_GLOBE_CAMERA_DISTANCE,
       initialCameraDistance: 240
     });
 

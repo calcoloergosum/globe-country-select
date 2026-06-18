@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLOBE_CAMERA_FAR, GLOBE_CAMERA_NEAR } from "./cameraConfig";
 
 const DEFAULT_WIDTH = 900;
 const DEFAULT_HEIGHT = 560;
@@ -69,7 +70,12 @@ export function createSceneLifecycle({
   onResize
 }: SceneLifecycleOptions): SceneLifecycle {
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, DEFAULT_WIDTH / DEFAULT_HEIGHT, 1, 1000);
+  const camera = new THREE.PerspectiveCamera(
+    45,
+    DEFAULT_WIDTH / DEFAULT_HEIGHT,
+    GLOBE_CAMERA_NEAR,
+    GLOBE_CAMERA_FAR
+  );
   camera.position.set(0, 0, initialCameraDistance);
 
   const renderer = new THREE.WebGLRenderer({
