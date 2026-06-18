@@ -29,11 +29,12 @@ export function CountryFlag({
 
   const iconClassName = `fi fi-${normalizedCode.toLowerCase()}`;
   const mergedClassName = className ? `${iconClassName} ${className}` : iconClassName;
+  const accessibleLabel = ariaLabel ?? spanAriaLabel;
   const accessibilityProps = decorative
     ? { "aria-hidden": true }
     : {
-        role: ariaLabel ? "img" : role,
-        "aria-label": ariaLabel ?? spanAriaLabel,
+        role: role ?? (accessibleLabel ? "img" : undefined),
+        "aria-label": accessibleLabel,
         "aria-hidden": spanAriaHidden
       };
 

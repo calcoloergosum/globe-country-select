@@ -33,11 +33,27 @@ describe("buildFlagPrompts", () => {
 
     expect(prompts).toHaveLength(4);
     expect(prompts.map((prompt) => prompt.flagCode)).toEqual(["GP", "DE", "US", "ZZ"]);
+    expect(prompts.map((prompt) => prompt.id)).toEqual([
+      "FR:FR-GP",
+      "DE:DE",
+      "UM:UM-US",
+      "ZZ:ZZ"
+    ]);
 
     expect(prompts[0].countries.map((country) => country.isoAlpha2)).toEqual(["GP", "FR"]);
     expect(prompts[1].countries.map((country) => country.isoAlpha2)).toEqual(["DE"]);
     expect(prompts[2].countries.map((country) => country.isoAlpha2)).toEqual(["US", "UM"]);
     expect(prompts[3].countries.map((country) => country.isoAlpha2)).toEqual(["ZZ"]);
+  });
+
+  it("creates the same shared-flag ids regardless of grouped country order", () => {
+    const forward = buildFlagPrompts([makeCountry("GP"), makeCountry("FR")]);
+    const reversed = buildFlagPrompts([makeCountry("FR"), makeCountry("GP")]);
+
+    expect(forward[0].flagCode).toBe("GP");
+    expect(reversed[0].flagCode).toBe("FR");
+    expect(forward[0].id).toBe("FR:FR-GP");
+    expect(reversed[0].id).toBe("FR:FR-GP");
   });
 });
 
@@ -48,9 +64,9 @@ describe("pickRandomFlagPrompt", () => {
     { random: 0.999, expected: "C" }
   ])("selects prompt $expected for rng()=$random", ({ random, expected }) => {
     const prompts: QuizFlagPrompt[] = [
-      { flagCode: "A", countries: [makeCountry("AA")] },
-      { flagCode: "B", countries: [makeCountry("BB")] },
-      { flagCode: "C", countries: [makeCountry("CC")] }
+      { id: "A:AA", flagCode: "A", countries: [makeCountry("AA")] },
+      { id: "B:BB", flagCode: "B", countries: [makeCountry("BB")] },
+      { id: "C:CC", flagCode: "C", countries: [makeCountry("CC")] }
     ];
 
     expect(pickRandomFlagPrompt(prompts, () => random)?.flagCode).toBe(expected);
@@ -63,9 +79,9 @@ describe("pickRandomFlagPrompt", () => {
 
 describe("pickNextFlagPrompt", () => {
   const prompts: QuizFlagPrompt[] = [
-    { flagCode: "A", countries: [makeCountry("AA")] },
-    { flagCode: "B", countries: [makeCountry("BB")] },
-    { flagCode: "C", countries: [makeCountry("CC")] }
+    { id: "A:AA", flagCode: "A", countries: [makeCountry("AA")] },
+    { id: "B:BB", flagCode: "B", countries: [makeCountry("BB")] },
+    { id: "C:CC", flagCode: "C", countries: [makeCountry("CC")] }
   ];
 
   it("uses an injected rng for deterministic prompt selection", () => {
@@ -75,6 +91,21 @@ describe("pickNextFlagPrompt", () => {
   it("does not immediately repeat the previous prompt when alternatives exist", () => {
     const prompt = pickNextFlagPrompt(prompts, {
       previousPrompt: prompts[0],
+      rng: () => 0
+    });
+
+    expect(prompt?.flagCode).toBe("B");
+  });
+
+  it("does not immediately repeat a prompt with the same id when objects are reconstructed", () => {
+    const reconstructedPreviousPrompt: QuizFlagPrompt = {
+      id: "A:AA",
+      flagCode: "A",
+      countries: [makeCountry("AA")]
+    };
+
+    const prompt = pickNextFlagPrompt(prompts, {
+      previousPrompt: reconstructedPreviousPrompt,
       rng: () => 0
     });
 

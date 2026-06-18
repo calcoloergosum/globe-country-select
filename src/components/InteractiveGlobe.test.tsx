@@ -202,8 +202,10 @@ import { InteractiveGlobe, type CountryFeature } from "./InteractiveGlobe";
 import {
   DEFAULT_GLOBE_CAMERA_DISTANCE,
   GLOBE_CAMERA_NEAR,
+  MAX_FOCUS_GLOBE_CAMERA_DISTANCE,
   MAX_GLOBE_CAMERA_DISTANCE,
   MIN_GLOBE_SURFACE_CLEARANCE,
+  getMinFocusGlobeCameraDistance,
   getMinGlobeCameraDistance
 } from "./interactiveGlobe/cameraConfig";
 import { ACTIVE_POLYGON_ALTITUDE } from "./interactiveGlobe/polygonStyling";
@@ -220,6 +222,17 @@ function makeCountryFeature(name: string, isoAlpha2: string): CountryFeature {
       coordinates: [[[0, 0], [1, 0], [0, 1], [0, 0]]]
     },
     bbox: [-5, 40, 10, 52]
+  };
+}
+
+function makeBoundedCountryFeature(
+  name: string,
+  isoAlpha2: string,
+  bbox: [number, number, number, number]
+): CountryFeature {
+  return {
+    ...makeCountryFeature(name, isoAlpha2),
+    bbox
   };
 }
 
@@ -359,9 +372,11 @@ describe("InteractiveGlobe", () => {
     const focusTargetBeforeDrag = renderLoopDeps.getFocusTarget();
     expect(focusTargetBeforeDrag).toMatchObject({ lat: 48.8, lng: 2.3 });
     expect(focusTargetBeforeDrag?.zoomDistance).toBeGreaterThanOrEqual(
-      getMinGlobeCameraDistance(DEFAULT_GLOBE_RADIUS)
+      getMinFocusGlobeCameraDistance(DEFAULT_GLOBE_RADIUS)
     );
-    expect(focusTargetBeforeDrag?.zoomDistance).toBeLessThanOrEqual(480);
+    expect(focusTargetBeforeDrag?.zoomDistance).toBeLessThanOrEqual(
+      MAX_FOCUS_GLOBE_CAMERA_DISTANCE
+    );
 
     act(() => {
       orbit.options.onDragStart?.();
@@ -393,6 +408,24 @@ describe("InteractiveGlobe", () => {
     );
     expect(lifecycle.camera.position.z).toBeLessThanOrEqual(MAX_GLOBE_CAMERA_DISTANCE);
     expect(lifecycle.controls.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not compute country focus distance below the named safe focus minimum", () => {
+    const tinyCountry = makeBoundedCountryFeature("Tiny", "TY", [0, 0, 0.01, 0.01]);
+
+    render(
+      <InteractiveGlobe
+        countries={[tinyCountry]}
+        focusLatLng={{ lat: 0, lng: 0 }}
+        focusCountry={tinyCountry}
+      />
+    );
+
+    const renderLoopDeps = mockState.renderLoopDeps[0];
+
+    expect(renderLoopDeps.getFocusTarget()?.zoomDistance).toBe(
+      getMinFocusGlobeCameraDistance(DEFAULT_GLOBE_RADIUS)
+    );
   });
 
   it("uses latest click callback ref and reapplies polygon styles for pin/highlight/clear updates", () => {

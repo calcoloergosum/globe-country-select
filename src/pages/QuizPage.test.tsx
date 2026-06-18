@@ -41,6 +41,7 @@ const mockState = vi.hoisted(() => {
       countries: [countryFeature],
       quizFlagPrompts: [
         {
+          id: "FR:FR",
           flagCode: "FR",
           countries: [
             {
@@ -98,6 +99,7 @@ vi.mock("./quiz/quizGlobeState", () => ({
 vi.mock("./quiz/useQuizRound", () => ({
   useQuizRound: vi.fn(() => ({
     current: {
+      id: "FR:FR",
       flagCode: "FR",
       countries: [
         {

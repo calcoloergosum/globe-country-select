@@ -21,6 +21,10 @@ function getDefaultHighlightedCountry(current: QuizPrompt): QuizHighlightedCount
   return current.countries[0] ?? null;
 }
 
+function findPromptCountry(current: QuizPrompt, isoAlpha2: string | undefined | null) {
+  return current.countries.find((country) => country.isoAlpha2 === isoAlpha2) ?? null;
+}
+
 export function useQuizRound(
   quizFlagPrompts: QuizFlagPrompt<CountryFeature>[]
 ): UseQuizRoundResult {
@@ -33,10 +37,65 @@ export function useQuizRound(
   const [result, setResult] = useState<QuizResult>(null);
 
   useEffect(() => {
-    if (!current && quizFlagPrompts.length > 0) {
-      setCurrent(pickNextFlagPrompt(quizFlagPrompts));
+    if (quizFlagPrompts.length === 0) {
+      if (current || selected || highlightedCountry || result !== null) {
+        setCurrent(null);
+        setSelected(null);
+        setHighlightedCountry(null);
+        setResult(null);
+        if (selected || highlightedCountry || result !== null) {
+          setQuizRound((round) => round + 1);
+        }
+      }
+      return;
     }
-  }, [current, quizFlagPrompts]);
+
+    if (!current) {
+      setCurrent(pickNextFlagPrompt(quizFlagPrompts));
+      return;
+    }
+
+    const updatedCurrent = quizFlagPrompts.find((prompt) => prompt.id === current.id) ?? null;
+    if (!updatedCurrent) {
+      setCurrent(pickNextFlagPrompt(quizFlagPrompts, { previousPrompt: current }));
+      setSelected(null);
+      setHighlightedCountry(null);
+      setResult(null);
+      if (selected || highlightedCountry || result !== null) {
+        setQuizRound((round) => round + 1);
+      }
+      return;
+    }
+
+    setCurrent(updatedCurrent);
+
+    let shouldClearGlobeSelection = false;
+    if (selected && !findPromptCountry(updatedCurrent, selected.isoAlpha2)) {
+      setSelected(null);
+      shouldClearGlobeSelection = true;
+    }
+
+    if (highlightedCountry) {
+      const updatedHighlightedCountry = findPromptCountry(
+        updatedCurrent,
+        highlightedCountry.isoAlpha2
+      );
+
+      if (updatedHighlightedCountry) {
+        setHighlightedCountry(updatedHighlightedCountry);
+      } else {
+        setHighlightedCountry(null);
+        if (result !== null) {
+          setResult(null);
+          shouldClearGlobeSelection = true;
+        }
+      }
+    }
+
+    if (shouldClearGlobeSelection) {
+      setQuizRound((round) => round + 1);
+    }
+  }, [quizFlagPrompts]);
 
   const startNextRound = useCallback(() => {
     if (quizFlagPrompts.length === 0) return;

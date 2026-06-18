@@ -67,6 +67,10 @@ The globe supports two country-picking behaviors:
 
 This distinction is intentional: exploration should feel forgiving, while quiz answers should be precise.
 
+## Rendering notes
+
+The globe is rendered as a mesh sphere. Close zoom keeps the camera outside a safe surface clearance so the near plane does not clip the earth mesh or elevated country overlays.
+
 ## Shared flags
 
 Some countries or territories share the same rendered flag image.

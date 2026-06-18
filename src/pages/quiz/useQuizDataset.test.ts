@@ -49,6 +49,7 @@ describe("useQuizDataset", () => {
     expect(result.current.quizCountries).toHaveLength(1);
     expect(result.current.quizCountries[0].isoAlpha2).toBe("FR");
     expect(result.current.quizFlagPrompts).toHaveLength(1);
+    expect(result.current.quizFlagPrompts[0].id).toBe("FR:FR");
     expect(result.current.quizFlagPrompts[0].flagCode).toBe("FR");
   });
 

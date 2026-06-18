@@ -8,6 +8,7 @@ import type { QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
 import { QuizOverlay } from "./QuizOverlay";
 
 const prompt: QuizFlagPrompt<CountryFeature> = {
+  id: "FR:FR",
   flagCode: "FR",
   countries: [
     {
@@ -25,6 +26,7 @@ const prompt: QuizFlagPrompt<CountryFeature> = {
 };
 
 const promptWithMultipleCountries: QuizFlagPrompt<CountryFeature> = {
+  id: "FR:FR-GP",
   flagCode: "FR",
   countries: [
     ...prompt.countries,

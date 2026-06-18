@@ -32,7 +32,9 @@ function makeCountry(isoAlpha2: string, lat = 10, lng = 20): QuizCountry<Country
 }
 
 function makePrompt(flagCode: string, countries = [makeCountry(flagCode)]): QuizFlagPrompt<CountryFeature> {
+  const groupedIsoCodes = countries.map((country) => country.isoAlpha2).sort();
   return {
+    id: `${groupedIsoCodes.includes(flagCode) ? groupedIsoCodes[0] : flagCode}:${groupedIsoCodes.join("-")}`,
     flagCode,
     countries
   };
@@ -158,6 +160,135 @@ describe("useQuizRound", () => {
     });
 
     expect(result.current.current?.flagCode).toBe("US");
+  });
+
+  it("replaces reconstructed prompt objects with the same ids while preserving the round", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const initialPrompts = [makePrompt("FR"), makePrompt("US")];
+    const reconstructedPrompts = [makePrompt("FR"), makePrompt("US")];
+    const { result, rerender } = renderHook(
+      ({ prompts }) => useQuizRound(prompts),
+      { initialProps: { prompts: initialPrompts } }
+    );
+
+    act(() => {
+      result.current.selectCountry({
+        lat: 48.8,
+        lng: 2.3,
+        label: "Country FR (FR)",
+        isoAlpha2: "FR"
+      });
+    });
+
+    const previousRound = result.current.quizRound;
+    rerender({ prompts: reconstructedPrompts });
+
+    expect(result.current.current).toBe(reconstructedPrompts[0]);
+    expect(result.current.selected?.isoAlpha2).toBe("FR");
+    expect(result.current.result).toBeNull();
+    expect(result.current.highlightedCountry).toBeNull();
+    expect(result.current.quizRound).toBe(previousRound);
+  });
+
+  it("resets state when the current prompt disappears from a changed dataset", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const initialPrompts = [makePrompt("FR"), makePrompt("US")];
+    const nextPrompts = [makePrompt("DE")];
+    const { result, rerender } = renderHook(
+      ({ prompts }) => useQuizRound(prompts),
+      { initialProps: { prompts: initialPrompts } }
+    );
+
+    act(() => {
+      result.current.selectCountry({
+        lat: 48.8,
+        lng: 2.3,
+        label: "Country FR (FR)",
+        isoAlpha2: "FR"
+      });
+    });
+
+    act(() => {
+      result.current.submitAnswer();
+    });
+
+    expect(result.current.result).toBe("correct");
+    rerender({ prompts: nextPrompts });
+
+    expect(result.current.current).toBe(nextPrompts[0]);
+    expect(result.current.selected).toBeNull();
+    expect(result.current.highlightedCountry).toBeNull();
+    expect(result.current.result).toBeNull();
+    expect(result.current.quizRound).toBe(1);
+  });
+
+  it("clears stale selected countries when a same-id prompt no longer contains them", () => {
+    const initialPrompt = makePrompt("GP", [
+      makeCountry("GP", 16.3, -61.5),
+      makeCountry("FR", 48.8, 2.3)
+    ]);
+    const changedPrompt = {
+      ...makePrompt("GP", [makeCountry("GP", 16.3, -61.5)]),
+      id: initialPrompt.id
+    };
+    const { result, rerender } = renderHook(
+      ({ prompts }) => useQuizRound(prompts),
+      { initialProps: { prompts: [initialPrompt] } }
+    );
+
+    act(() => {
+      result.current.selectCountry({
+        lat: 48.8,
+        lng: 2.3,
+        label: "Country FR (FR)",
+        isoAlpha2: "FR"
+      });
+    });
+
+    rerender({ prompts: [changedPrompt] });
+
+    expect(result.current.current).toBe(changedPrompt);
+    expect(result.current.selected).toBeNull();
+    expect(result.current.highlightedCountry).toBeNull();
+    expect(result.current.result).toBeNull();
+    expect(result.current.quizRound).toBe(1);
+  });
+
+  it("clears stale highlighted results when a same-id prompt no longer contains them", () => {
+    const initialPrompt = makePrompt("GP", [
+      makeCountry("GP", 16.3, -61.5),
+      makeCountry("FR", 48.8, 2.3)
+    ]);
+    const changedPrompt = {
+      ...makePrompt("GP", [makeCountry("GP", 16.3, -61.5)]),
+      id: initialPrompt.id
+    };
+    const { result, rerender } = renderHook(
+      ({ prompts }) => useQuizRound(prompts),
+      { initialProps: { prompts: [initialPrompt] } }
+    );
+
+    act(() => {
+      result.current.selectCountry({
+        lat: 48.8,
+        lng: 2.3,
+        label: "Country FR (FR)",
+        isoAlpha2: "FR"
+      });
+    });
+
+    act(() => {
+      result.current.submitAnswer();
+    });
+
+    expect(result.current.highlightedCountry?.isoAlpha2).toBe("FR");
+    rerender({ prompts: [changedPrompt] });
+
+    expect(result.current.current).toBe(changedPrompt);
+    expect(result.current.selected).toBeNull();
+    expect(result.current.highlightedCountry).toBeNull();
+    expect(result.current.result).toBeNull();
+    expect(result.current.quizRound).toBe(1);
   });
 
   it("highlights one valid country when the answer is revealed", () => {

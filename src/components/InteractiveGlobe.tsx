@@ -13,6 +13,7 @@ import { createPolygonStyleApplicator } from "./interactiveGlobe/polygonStyling"
 import {
   DEFAULT_GLOBE_CAMERA_DISTANCE,
   MAX_GLOBE_CAMERA_DISTANCE,
+  clampFocusGlobeCameraDistance,
   getMinGlobeCameraDistance
 } from "./interactiveGlobe/cameraConfig";
 
@@ -317,7 +318,7 @@ function getFitDistanceForCountry(country: CountryFeature) {
     globeRadius * Math.cos(angularRadius) +
     (globeRadius * Math.sin(angularRadius)) / Math.max(tangent, 0.01);
 
-  return THREE.MathUtils.clamp(distance, 120, 480);
+  return clampFocusGlobeCameraDistance(distance, globeRadius);
 }
 
 function getCountryBounds(country: CountryFeature) {

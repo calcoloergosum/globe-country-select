@@ -11,6 +11,7 @@ export interface QuizCountry<TFeature = unknown> {
 }
 
 export interface QuizFlagPrompt<TFeature = unknown> {
+  id: string;
   flagCode: string;
   countries: QuizCountry<TFeature>[];
 }
@@ -29,6 +30,17 @@ const isoToShasum = new Map<string, string>(
     isoAlpha2List.map((iso) => [iso, shasum] as [string, string])
   )
 );
+
+function buildPromptId<TFeature>(flagCode: string, countries: QuizCountry<TFeature>[]) {
+  const normalizedFlagCode = flagCode.trim().toUpperCase();
+  const groupedIsoCodes = countries
+    .map((country) => country.isoAlpha2.trim().toUpperCase())
+    .sort();
+  const canonicalFlagCode = groupedIsoCodes.includes(normalizedFlagCode)
+    ? groupedIsoCodes[0]
+    : normalizedFlagCode;
+  return `${canonicalFlagCode}:${groupedIsoCodes.join("-")}`;
+}
 
 /**
  * Groups a list of QuizCountry entries by their canonical flag (SVG shasum),
@@ -51,7 +63,10 @@ export function buildFlagPrompts<TFeature>(countries: QuizCountry<TFeature>[]): 
     }
   }
 
-  return Array.from(byShasum.values());
+  return Array.from(byShasum.values()).map((prompt) => ({
+    id: buildPromptId(prompt.flagCode, prompt.countries),
+    ...prompt
+  }));
 }
 
 export function pickRandomFlagPrompt<TFeature>(
@@ -72,7 +87,7 @@ export function pickNextFlagPrompt<TFeature>(
 
   const candidates =
     prompts.length > 1 && previousPrompt
-      ? prompts.filter((prompt) => prompt !== previousPrompt)
+      ? prompts.filter((prompt) => prompt.id !== previousPrompt.id)
       : prompts;
 
   return pickRandomFlagPrompt(candidates.length > 0 ? candidates : prompts, rng);

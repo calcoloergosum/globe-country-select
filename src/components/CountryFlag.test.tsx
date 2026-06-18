@@ -40,6 +40,7 @@ describe("CountryFlag", () => {
     expect(span?.className).toContain("fi fi-fr");
     expect(span?.className).toContain("quiz-flag");
     expect(span?.getAttribute("aria-label")).toBe("country-flag");
+    expect(span?.getAttribute("role")).toBe("img");
   });
 
   it("renders an image role and accessible label when ariaLabel is provided", () => {
@@ -59,6 +60,17 @@ describe("CountryFlag", () => {
     const span = container.querySelector("span");
     expect(span?.getAttribute("aria-hidden")).toBe("true");
     expect(span?.hasAttribute("role")).toBe(false);
+  });
+
+  it("preserves an explicit role when a label is provided", () => {
+    hasFlagIconMock.mockReturnValue(true);
+    const { container } = render(
+      <CountryFlag code="fr" role="presentation" aria-label="Flag of France" />
+    );
+
+    const span = container.querySelector("span");
+    expect(span?.getAttribute("role")).toBe("presentation");
+    expect(span?.getAttribute("aria-label")).toBe("Flag of France");
   });
 
   it("lets decorative flags win over ariaLabel", () => {
