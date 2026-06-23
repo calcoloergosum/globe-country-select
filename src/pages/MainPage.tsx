@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { InteractiveGlobe, type GlobeEventData } from "../components/InteractiveGlobe";
 import { CountryFlag } from "../components/CountryFlag";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
-import globeImageUrl from "../8081_earthmap10k.jpg";
-import { parseCountriesGeoJsonRaw } from "../utils/countryData";
+import globeImageUrl from "../earthmap-4k.jpg";
+import bumpImageUrl from "../earth-topology.png";
+import { parseCountriesGeoJson } from "../utils/countryData";
 import type { AppPage } from "./types";
 
 type MainPageProps = {
@@ -29,7 +30,7 @@ export function MainPage({ page, onNavigate }: MainPageProps) {
   const [hovered, setHovered] = useState<GlobeEventData | null>(null);
   const [clicked, setClicked] = useState<GlobeEventData | null>(null);
 
-  const countries = useMemo(() => parseCountriesGeoJsonRaw(countriesGeoJsonRaw), []);
+  const countries = useMemo(() => parseCountriesGeoJson(countriesGeoJsonRaw), []);
 
   return (
     <main className="globe-page">
@@ -39,6 +40,7 @@ export function MainPage({ page, onNavigate }: MainPageProps) {
           onPointHover={setHovered}
           onPointClick={setClicked}
           globeImageUrl={globeImageUrl}
+          bumpImageUrl={bumpImageUrl}
         />
 
         <aside className="overlay-modal" role="region" aria-label="Explore controls">

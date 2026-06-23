@@ -1,7 +1,8 @@
 // Quiz page composition that wires dataset, round logic, shortcuts, globe, and overlay UI.
 import { InteractiveGlobe, type GlobeEventData } from "../components/InteractiveGlobe";
 import countriesGeoJsonRaw from "../ne_50m_admin_0_countries.geojson?raw";
-import globeImageUrl from "../8081_earthmap10k.jpg";
+import globeImageUrl from "../earthmap-4k.jpg";
+import bumpImageUrl from "../earth-topology.png";
 import { QuizOverlay } from "./quiz/QuizOverlay";
 import type { AppPage } from "./types";
 import { deriveQuizGlobeState } from "./quiz/quizGlobeState";
@@ -50,6 +51,7 @@ export function QuizPage({ page, onNavigate }: QuizPageProps) {
         <InteractiveGlobe
           countries={countries}
           globeImageUrl={globeImageUrl}
+          bumpImageUrl={bumpImageUrl}
           highlightOnHover={result === null}
           pinnedCountryIsoA2={pinnedIso}
           clearSelectionSignal={quizRound}

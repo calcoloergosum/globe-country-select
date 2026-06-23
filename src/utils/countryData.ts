@@ -15,6 +15,21 @@ type RawCountryFeature = {
   bbox?: unknown;
 };
 
+// Parsing the full country GeoJSON is multi-megabyte work. Cache the most
+// recent raw input so switching between pages (which remounts them) reuses the
+// parsed result instead of re-parsing the same data on every navigation.
+let cachedRawGeoJson: string | null = null;
+let cachedCountries: CountryFeature[] = [];
+
+export function parseCountriesGeoJson(rawGeoJson: string): CountryFeature[] {
+  if (rawGeoJson !== cachedRawGeoJson) {
+    cachedRawGeoJson = rawGeoJson;
+    cachedCountries = parseCountriesGeoJsonRaw(rawGeoJson);
+  }
+
+  return cachedCountries;
+}
+
 export function parseCountriesGeoJsonRaw(rawGeoJson: string): CountryFeature[] {
   let parsed: { features?: unknown };
   try {

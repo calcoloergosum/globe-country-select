@@ -36,6 +36,11 @@ export function useQuizRound(
   const [highlightedCountry, setHighlightedCountry] = useState<QuizHighlightedCountry>(null);
   const [result, setResult] = useState<QuizResult>(null);
 
+  // Reconciles the active round when the prompt dataset changes (e.g. dataset
+  // reload). Deliberately depends only on `quizFlagPrompts`: it reads the other
+  // state values but must not re-run when they change, or selecting/submitting
+  // mid-round would re-trigger reconciliation. The reads are intentional, so the
+  // exhaustive-deps lint is not applied here.
   useEffect(() => {
     if (quizFlagPrompts.length === 0) {
       if (current || selected || highlightedCountry || result !== null) {

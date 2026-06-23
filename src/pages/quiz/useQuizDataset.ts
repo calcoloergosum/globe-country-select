@@ -7,7 +7,7 @@ import {
   getCountryLatLng,
   getCountryName,
   getFeatureIso2,
-  parseCountriesGeoJsonRaw
+  parseCountriesGeoJson
 } from "../../utils/countryData";
 
 type QuizDataset = {
@@ -18,7 +18,7 @@ type QuizDataset = {
 
 export function useQuizDataset(rawCountriesGeoJson: string): QuizDataset {
   const countries = useMemo(
-    () => parseCountriesGeoJsonRaw(rawCountriesGeoJson),
+    () => parseCountriesGeoJson(rawCountriesGeoJson),
     [rawCountriesGeoJson]
   );
 

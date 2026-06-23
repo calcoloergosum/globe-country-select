@@ -246,14 +246,11 @@ export default class Globe extends THREE.Group {
             })
         );
 
-        const strokeLines = geometryData.strokeGeometries.map((geometry, index) => {
+        geometryData.strokeGeometries.forEach((geometry, index) => {
           const line = new THREE.LineLoop(geometry, strokeMaterials[index]);
           line.renderOrder = 1;
           this.polygonsGroup.add(line);
-          return line;
         });
-
-        void strokeLines;
 
         this.polygonVisuals.push({
           country,

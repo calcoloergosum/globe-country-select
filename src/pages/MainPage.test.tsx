@@ -10,7 +10,7 @@ const mockState = vi.hoisted(() => ({
     onPointHover?: (point: { lat: number; lng: number; label: string; isoAlpha2?: string } | null) => void;
     onPointClick?: (point: { lat: number; lng: number; label: string; isoAlpha2?: string } | null) => void;
   },
-  parseCountriesGeoJsonRaw: vi.fn(() => [
+  parseCountriesGeoJson: vi.fn(() => [
     {
       type: "Feature",
       properties: { ADMIN: "France", ISO_A2: "FR" },
@@ -51,7 +51,7 @@ vi.mock("../components/InteractiveGlobe", () => ({
 }));
 
 vi.mock("../utils/countryData", () => ({
-  parseCountriesGeoJsonRaw: mockState.parseCountriesGeoJsonRaw
+  parseCountriesGeoJson: mockState.parseCountriesGeoJson
 }));
 
 import { MainPage } from "./MainPage";
@@ -61,7 +61,7 @@ describe("MainPage", () => {
     const onNavigate = vi.fn();
     render(<MainPage page="main" onNavigate={onNavigate} />);
 
-    expect(mockState.parseCountriesGeoJsonRaw).toHaveBeenCalledTimes(1);
+    expect(mockState.parseCountriesGeoJson).toHaveBeenCalledTimes(1);
     expect(mockState.interactiveGlobeProps?.countries).toHaveLength(1);
     expect(mockState.interactiveGlobeProps?.globeImageUrl).toBeTypeOf("string");
 
