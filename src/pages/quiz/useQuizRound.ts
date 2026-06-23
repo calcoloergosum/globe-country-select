@@ -25,6 +25,52 @@ function findPromptCountry(current: QuizPrompt, isoAlpha2: string | undefined | 
   return current.countries.find((country) => country.isoAlpha2 === isoAlpha2) ?? null;
 }
 
+type ReconciledRoundState = {
+  selected: QuizSelection;
+  highlightedCountry: QuizHighlightedCountry;
+  result: QuizResult;
+  // The globe holds its own selection; clearing it requires bumping a signal.
+  clearGlobeSelection: boolean;
+};
+
+// When the dataset is replaced by an equivalent prompt with the same id (e.g.
+// a re-parse produces fresh objects), the round should survive but any selected
+// or highlighted country that no longer exists in the new prompt must be dropped.
+// Pure so the reconciliation rules can be read and tested in isolation.
+function reconcileSameIdPrompt(
+  updatedPrompt: QuizPrompt,
+  selected: QuizSelection,
+  highlightedCountry: QuizHighlightedCountry,
+  result: QuizResult
+): ReconciledRoundState {
+  const next: ReconciledRoundState = {
+    selected,
+    highlightedCountry,
+    result,
+    clearGlobeSelection: false
+  };
+
+  if (selected && !findPromptCountry(updatedPrompt, selected.isoAlpha2)) {
+    next.selected = null;
+    next.clearGlobeSelection = true;
+  }
+
+  if (highlightedCountry) {
+    const updatedHighlightedCountry = findPromptCountry(updatedPrompt, highlightedCountry.isoAlpha2);
+    if (updatedHighlightedCountry) {
+      next.highlightedCountry = updatedHighlightedCountry;
+    } else {
+      next.highlightedCountry = null;
+      if (result !== null) {
+        next.result = null;
+        next.clearGlobeSelection = true;
+      }
+    }
+  }
+
+  return next;
+}
+
 export function useQuizRound(
   quizFlagPrompts: QuizFlagPrompt<CountryFeature>[]
 ): UseQuizRoundResult {
@@ -36,68 +82,59 @@ export function useQuizRound(
   const [highlightedCountry, setHighlightedCountry] = useState<QuizHighlightedCountry>(null);
   const [result, setResult] = useState<QuizResult>(null);
 
-  // Reconciles the active round when the prompt dataset changes (e.g. dataset
-  // reload). Deliberately depends only on `quizFlagPrompts`: it reads the other
-  // state values but must not re-run when they change, or selecting/submitting
-  // mid-round would re-trigger reconciliation. The reads are intentional, so the
-  // exhaustive-deps lint is not applied here.
+  // Reconciles the active round when the prompt dataset changes (e.g. a re-parse
+  // hands back equivalent prompts as fresh objects). Deliberately depends only on
+  // `quizFlagPrompts`: it reads the other state values but must not re-run when
+  // they change, or selecting/submitting mid-round would re-trigger
+  // reconciliation. The reads are intentional, so exhaustive-deps is not applied.
+  //
+  // React bails out of identical state updates, so the unconditional setters
+  // below only re-render when reconciliation actually changes a value.
   useEffect(() => {
+    const hadActiveRoundState =
+      selected !== null || highlightedCountry !== null || result !== null;
+
+    // Dataset emptied: tear the round down.
     if (quizFlagPrompts.length === 0) {
-      if (current || selected || highlightedCountry || result !== null) {
+      if (current || hadActiveRoundState) {
         setCurrent(null);
         setSelected(null);
         setHighlightedCountry(null);
         setResult(null);
-        if (selected || highlightedCountry || result !== null) {
+        if (hadActiveRoundState) {
           setQuizRound((round) => round + 1);
         }
       }
       return;
     }
 
+    // No active prompt yet: start one.
     if (!current) {
       setCurrent(pickNextFlagPrompt(quizFlagPrompts));
       return;
     }
 
+    // Current prompt is gone from the new dataset: advance to a fresh round.
     const updatedCurrent = quizFlagPrompts.find((prompt) => prompt.id === current.id) ?? null;
     if (!updatedCurrent) {
       setCurrent(pickNextFlagPrompt(quizFlagPrompts, { previousPrompt: current }));
       setSelected(null);
       setHighlightedCountry(null);
       setResult(null);
-      if (selected || highlightedCountry || result !== null) {
+      if (hadActiveRoundState) {
         setQuizRound((round) => round + 1);
       }
       return;
     }
 
+    // Same prompt survived (possibly as a new object): keep the round, drop any
+    // selection/highlight that no longer exists in the refreshed prompt.
+    const reconciled = reconcileSameIdPrompt(updatedCurrent, selected, highlightedCountry, result);
     setCurrent(updatedCurrent);
-
-    let shouldClearGlobeSelection = false;
-    if (selected && !findPromptCountry(updatedCurrent, selected.isoAlpha2)) {
-      setSelected(null);
-      shouldClearGlobeSelection = true;
-    }
-
-    if (highlightedCountry) {
-      const updatedHighlightedCountry = findPromptCountry(
-        updatedCurrent,
-        highlightedCountry.isoAlpha2
-      );
-
-      if (updatedHighlightedCountry) {
-        setHighlightedCountry(updatedHighlightedCountry);
-      } else {
-        setHighlightedCountry(null);
-        if (result !== null) {
-          setResult(null);
-          shouldClearGlobeSelection = true;
-        }
-      }
-    }
-
-    if (shouldClearGlobeSelection) {
+    setSelected(reconciled.selected);
+    setHighlightedCountry(reconciled.highlightedCountry);
+    setResult(reconciled.result);
+    if (reconciled.clearGlobeSelection) {
       setQuizRound((round) => round + 1);
     }
   }, [quizFlagPrompts]);

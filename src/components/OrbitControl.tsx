@@ -49,6 +49,23 @@ type OrbitControlOptions = {
   onClick?: (clientX: number, clientY: number, event: MouseEvent) => void;
 };
 
+// Pointer coordinate reconciliation.
+//
+// Downstream picking maps client coordinates to the canvas with
+// getBoundingClientRect(), which per spec is in the same (layout viewport)
+// space as PointerEvent.clientX/Y — so "identity" is correct on every
+// spec-compliant browser and is always tried first.
+//
+// In practice some mobile browsers (notably iOS Safari under pinch-zoom)
+// disagree about whether clientX/Y are reported in the layout or the visual
+// viewport, which shifts/scales the hit point and can make near-edge presses
+// miss the globe entirely. The remaining modes re-express the point through the
+// visualViewport offset and/or scale to recover a hit on those devices:
+//   - viewportOffset: add visualViewport offset (pan only, scale === 1)
+//   - descaled:       undo visualViewport scale about the canvas rect
+//   - offsetDescaled: undo both offset and scale together
+// The first mode that yields a globe hit is remembered and tried first next
+// time, so the fallback cost is paid at most once per device/session.
 type PointerCoordinateMode = "identity" | "viewportOffset" | "descaled" | "offsetDescaled";
 
 const pointerCoordinateModes: PointerCoordinateMode[] = [
