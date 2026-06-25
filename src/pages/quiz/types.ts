@@ -1,13 +1,14 @@
 // Shared quiz domain types for prompts, selections, and result states.
 import type { CountryFeature, GlobeEventData } from "../../components/InteractiveGlobe";
-import type { QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
+import type { QuizPrompt as GenericQuizPrompt } from "../../utils/quizPrompts";
 import type { AppPage } from "../types";
 
 export type { AppPage };
+export type { QuizQuestionSet } from "../../utils/quizPrompts";
 
 export type QuizResult = "correct" | "incorrect" | "revealed" | null;
 
-export type QuizPrompt = QuizFlagPrompt<CountryFeature>;
+export type QuizPrompt = GenericQuizPrompt<CountryFeature>;
 
 export type QuizSelection = GlobeEventData | null;
 
