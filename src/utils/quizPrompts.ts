@@ -20,11 +20,23 @@ export interface QuizPromptIndicator {
 }
 
 export interface QuizPromptMetadata {
-  topic: "location" | "ranking";
+  topic:
+    | "location"
+    | "ranking"
+    | "feature-country"
+    | "capital-country"
+    | "border-intersection"
+    | "landlocked"
+    | "region-membership"
+    | "hemisphere"
+    | "country-ranking";
   transformation: string;
   year?: number;
   indicator?: QuizPromptIndicator;
   coverage?: string;
+  sourceIds?: readonly string[];
+  recordIds?: readonly string[];
+  templateId?: string;
 }
 
 interface QuizPromptBase<TFeature> {

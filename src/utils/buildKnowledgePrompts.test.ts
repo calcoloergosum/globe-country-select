@@ -1,136 +1,98 @@
 import { describe, expect, it } from "vitest";
 
-import type { KnowledgeQuestionDefinition } from "../data/knowledgeQuestions";
-import { buildKnowledgePrompts, formatOrdinal } from "./buildKnowledgePrompts";
+import {
+  buildKnowledgePromptGenerationResult,
+  buildKnowledgePrompts,
+  formatOrdinal
+} from "./buildKnowledgePrompts";
 import type { QuizCountry } from "./quizPrompts";
 
-function makeCountry(isoAlpha2: string, name = isoAlpha2): QuizCountry {
-  return { feature: {}, isoAlpha2, lat: 0, lng: 0, name };
+function makeCountry(isoAlpha2: string, name = isoAlpha2, lat = 10, lng = 10): QuizCountry {
+  return { feature: {}, isoAlpha2, lat, lng, name };
 }
 
-const source = { name: "Test source", url: "https://example.com" };
+const representativeCountries = [
+  makeCountry("JP", "Japan", 36, 138),
+  makeCountry("KE", "Kenya", 0.5, 38),
+  makeCountry("TZ", "Tanzania", -6, 35),
+  makeCountry("UG", "Uganda", 2, 33),
+  makeCountry("CN", "China", 32, 106),
+  makeCountry("NP", "Nepal", 28, 84),
+  makeCountry("DE", "Germany", 51, 10),
+  makeCountry("IT", "Italy", 45, 11),
+  makeCountry("AT", "Austria", 47, 14),
+  makeCountry("CH", "Switzerland", 47, 7),
+  makeCountry("FR", "France", 47, 3),
+  makeCountry("US", "United States", 40, -97),
+  makeCountry("CA", "Canada", 56, -106),
+  makeCountry("BR", "Brazil", -12, -50),
+  makeCountry("NL", "Netherlands", 52, 5),
+  makeCountry("IN", "India", 23, 79),
+  makeCountry("ID", "Indonesia", -2, 118),
+  makeCountry("PK", "Pakistan", 30, 70),
+  makeCountry("RU", "Russia", 61, 96),
+  makeCountry("DK", "Denmark", 56, 10),
+  makeCountry("FI", "Finland", 64, 26),
+  makeCountry("IS", "Iceland", 65, -19),
+  makeCountry("NO", "Norway", 62, 10),
+  makeCountry("SE", "Sweden", 62, 15),
+  makeCountry("EE", "Estonia", 59, 26),
+  makeCountry("LV", "Latvia", 57, 25),
+  makeCountry("LT", "Lithuania", 56, 24)
+];
 
 describe("buildKnowledgePrompts", () => {
-  it("builds the Lake Biwa and 2024 population prompts from source records", () => {
-    const prompts = buildKnowledgePrompts([
-      makeCountry("JP", "Japan"),
-      makeCountry("IN", "India"),
-      makeCountry("CN", "China"),
-      makeCountry("US", "United States"),
-      makeCountry("ID", "Indonesia"),
-      makeCountry("PK", "Pakistan")
-    ]);
+  it("builds sourced prompts from normalized geographic entities and relationships", () => {
+    const prompts = buildKnowledgePrompts(representativeCountries, { seed: "test" });
 
-    expect(prompts).toHaveLength(2);
-    expect(prompts[0]).toMatchObject({
-      id: "knowledge:lake-biwa-country:JP",
-      question: "In which country is Lake Biwa?",
-      countries: [{ isoAlpha2: "JP", name: "Japan" }],
-      source: { name: "Lake Biwa Museum — Facts of Lake Biwa" },
-      metadata: { topic: "location" }
+    expect(prompts.length).toBeGreaterThanOrEqual(10);
+    expect(prompts).toEqual(buildKnowledgePrompts(representativeCountries, { seed: "test" }));
+
+    const lakeVictoria = prompts.find((prompt) => prompt.id.startsWith("knowledge:feature-country:feature-q5505"));
+    expect(lakeVictoria).toMatchObject({
+      metadata: {
+        topic: "feature-country",
+        sourceIds: ["wikidata-geographic-entities"]
+      }
     });
-    expect(prompts[1]).toMatchObject({
-      id: "knowledge:population-total-2024-rank-2:CN",
+    expect(lakeVictoria?.countries.map((country) => country.isoAlpha2)).toEqual(["KE", "TZ", "UG"]);
+
+    const berlin = prompts.find((prompt) => prompt.id === "knowledge:capital-country:settlement-q64:DE");
+    expect(berlin).toMatchObject({
+      question: expect.stringContaining("Berlin"),
+      countries: [{ isoAlpha2: "DE", name: "Germany" }]
+    });
+
+    const borderIntersection = prompts.find((prompt) =>
+      prompt.id.startsWith("knowledge:border-intersection:border-intersection-de-it")
+    );
+    expect(borderIntersection?.countries.map((country) => country.isoAlpha2)).toEqual(["AT", "CH", "FR"]);
+
+    const population = prompts.find((prompt) =>
+      prompt.id === "knowledge:country-ranking:country-ranking-sp-pop-totl-2024-descending-2:CN"
+    );
+    expect(population).toMatchObject({
       question: "Which country had the 2nd largest population in 2024?",
       countries: [{ isoAlpha2: "CN", name: "China" }],
-      source: { name: "World Bank — Population, total (SP.POP.TOTL)" },
       metadata: {
-        topic: "ranking",
+        topic: "country-ranking",
         year: 2024,
         indicator: { code: "SP.POP.TOTL" }
       }
     });
-    expect(prompts[1].explanation).toContain("China ranks 2nd");
   });
 
-  it("supports ascending rankings and accepts every country tied at the target value", () => {
-    const definitions: KnowledgeQuestionDefinition[] = [
-      {
-        kind: "ranking",
-        id: "smallest-test",
-        questionNoun: "test value",
-        indicator: { code: "TEST", label: "Test value" },
-        year: 2020,
-        rank: 2,
-        direction: "ascending",
-        values: [
-          { isoAlpha2: "AA", value: 1 },
-          { isoAlpha2: "BB", value: 2 },
-          { isoAlpha2: "CC", value: 2 },
-          { isoAlpha2: "DD", value: 4 }
-        ],
-        coverage: "Complete test fixture",
-        source
-      }
-    ];
+  it("exposes rejection diagnostics for unsafe or underspecified source records", () => {
+    const result = buildKnowledgePromptGenerationResult(representativeCountries);
 
-    const [prompt] = buildKnowledgePrompts(
-      [makeCountry("AA"), makeCountry("BB"), makeCountry("CC"), makeCountry("DD")],
-      definitions
+    expect(result.rejections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ recordId: "feature:Q6583", reason: "excluded-by-feature-answer-strategy" }),
+        expect.objectContaining({ recordId: "settlement:Q1218", reason: "disputed-capital-status" }),
+        expect.objectContaining({ recordId: "region:south-america-sample", reason: "incomplete-region-membership" }),
+        expect.objectContaining({ recordId: "country-adjacency:RS:XK", reason: "disputed-adjacency-skipped" })
+      ])
     );
-
-    expect(prompt.question).toBe("Which country had the 2nd smallest test value in 2020?");
-    expect(prompt.countries.map((country) => country.isoAlpha2)).toEqual(["BB", "CC"]);
-    expect(prompt.explanation).toContain("BB and CC share 2nd");
-    expect(prompt.metadata.transformation).toContain("lowest to highest");
-  });
-
-  it("skips definitions with invalid ranks or unavailable accepted answers", () => {
-    const definitions: KnowledgeQuestionDefinition[] = [
-      {
-        kind: "location",
-        id: "missing-location",
-        question: "Where?",
-        answerIsoAlpha2: ["AA", "ZZ"],
-        explanation: "Missing answer",
-        source
-      },
-      {
-        kind: "ranking",
-        id: "invalid-rank",
-        questionNoun: "value",
-        indicator: { code: "TEST", label: "Test" },
-        year: 2020,
-        rank: 0,
-        direction: "descending",
-        values: [{ isoAlpha2: "AA", value: 10 }],
-        coverage: "Fixture",
-        source
-      },
-      {
-        kind: "ranking",
-        id: "out-of-range",
-        questionNoun: "value",
-        indicator: { code: "TEST", label: "Test" },
-        year: 2020,
-        rank: 3,
-        direction: "descending",
-        values: [
-          { isoAlpha2: "AA", value: Number.NaN },
-          { isoAlpha2: "BB", value: 5 }
-        ],
-        coverage: "Fixture",
-        source
-      },
-      {
-        kind: "ranking",
-        id: "missing-tied-answer",
-        questionNoun: "value",
-        indicator: { code: "TEST", label: "Test" },
-        year: 2020,
-        rank: 2,
-        direction: "descending",
-        values: [
-          { isoAlpha2: "AA", value: 10 },
-          { isoAlpha2: "BB", value: 5 },
-          { isoAlpha2: "ZZ", value: 5 }
-        ],
-        coverage: "Fixture",
-        source
-      }
-    ];
-
-    expect(buildKnowledgePrompts([makeCountry("AA"), makeCountry("BB")], definitions)).toEqual([]);
   });
 });
 

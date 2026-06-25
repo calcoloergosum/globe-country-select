@@ -73,7 +73,7 @@ describe("QuizOverlay knowledge prompts", () => {
     view.rerender(<QuizOverlay {...commonProps} result="revealed" />);
 
     expect(screen.queryByText("Answer:", { exact: false })).not.toBeNull();
-    expect(screen.queryByText("China", { exact: false })).not.toBeNull();
+    expect(screen.queryAllByText("China", { exact: false }).length).toBeGreaterThan(0);
     expect(screen.queryByText(populationPrompt.explanation)).not.toBeNull();
     expect(screen.getByRole("link", { name: /World Bank/ }).getAttribute("href")).toBe(populationPrompt.source.url);
     expect(screen.queryByText("How this question was built")).not.toBeNull();

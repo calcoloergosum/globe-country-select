@@ -39,7 +39,18 @@ function PromptContent({ prompt }: { prompt: QuizPrompt }) {
     return <CountryFlag code={prompt.flagCode} className="quiz-flag" ariaLabel="Flag to identify" />;
   }
 
-  const categoryLabel = prompt.metadata.topic === "ranking" ? "Data ranking" : "Place";
+  const categoryLabelByTopic: Record<typeof prompt.metadata.topic, string> = {
+    location: "Place",
+    ranking: "Data ranking",
+    "feature-country": "Physical geography",
+    "capital-country": "Capital",
+    "border-intersection": "Borders",
+    landlocked: "Spatial fact",
+    "region-membership": "Region",
+    hemisphere: "Coordinates",
+    "country-ranking": "Data ranking"
+  };
+  const categoryLabel = categoryLabelByTopic[prompt.metadata.topic];
 
   return (
     <div className="quiz-question-card">

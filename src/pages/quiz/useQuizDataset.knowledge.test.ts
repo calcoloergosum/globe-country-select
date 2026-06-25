@@ -17,7 +17,7 @@ function makeFeature(name: string, isoAlpha2: string, offset: number) {
 }
 
 describe("useQuizDataset world knowledge", () => {
-  it("builds location and ranked-population prompts from globe countries", () => {
+  it("builds geographic knowledge prompts from globe countries", () => {
     const raw = JSON.stringify({
       type: "FeatureCollection",
       features: [
@@ -33,11 +33,14 @@ describe("useQuizDataset world knowledge", () => {
     const { result } = renderHook(() => useQuizDataset(raw));
 
     expect(result.current.quizCountries).toHaveLength(6);
-    expect(result.current.quizKnowledgePrompts).toHaveLength(2);
-    expect(result.current.quizKnowledgePrompts.map((prompt: { question: string }) => prompt.question)).toEqual([
-      "In which country is Lake Biwa?",
-      "Which country had the 2nd largest population in 2024?"
-    ]);
-    expect(result.current.quizKnowledgePrompts[1].countries.map((country: { isoAlpha2: string }) => country.isoAlpha2)).toEqual(["CN"]);
+    expect(result.current.quizKnowledgePrompts.length).toBeGreaterThanOrEqual(3);
+    expect(result.current.quizKnowledgePrompts.map((prompt: { metadata: { topic: string } }) => prompt.metadata.topic)).toEqual(
+      expect.arrayContaining(["feature-country", "hemisphere", "country-ranking"])
+    );
+
+    const populationPrompt = result.current.quizKnowledgePrompts.find((prompt) =>
+      prompt.id === "knowledge:country-ranking:country-ranking-sp-pop-totl-2024-descending-2:CN"
+    );
+    expect(populationPrompt?.countries.map((country: { isoAlpha2: string }) => country.isoAlpha2)).toEqual(["CN"]);
   });
 });
