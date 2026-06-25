@@ -1,8 +1,10 @@
-// Builds and memoizes quiz-ready country datasets and grouped flag prompts.
+// Builds and memoizes quiz-ready country, flag, and world-knowledge datasets.
 import { useMemo } from "react";
 import type { CountryFeature } from "../../components/InteractiveGlobe";
+import { buildKnowledgePrompts } from "../../utils/buildKnowledgePrompts";
 import { hasFlagIcon } from "../../utils/flagIcons";
-import { buildFlagPrompts, type QuizCountry, type QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
+import { buildFlagPrompts } from "../../utils/pickRandomFlagPrompt";
+import type { QuizCountry, QuizFlagPrompt, QuizKnowledgePrompt } from "../../utils/quizPrompts";
 import {
   getCountryLatLng,
   getCountryName,
@@ -14,6 +16,7 @@ type QuizDataset = {
   countries: CountryFeature[];
   quizCountries: QuizCountry<CountryFeature>[];
   quizFlagPrompts: QuizFlagPrompt<CountryFeature>[];
+  quizKnowledgePrompts: QuizKnowledgePrompt<CountryFeature>[];
 };
 
 export function useQuizDataset(rawCountriesGeoJson: string): QuizDataset {
@@ -23,29 +26,30 @@ export function useQuizDataset(rawCountriesGeoJson: string): QuizDataset {
   );
 
   const quizCountries = useMemo<QuizCountry<CountryFeature>[]>(() => {
-    return countries
-      .map((feature) => {
-        const isoAlpha2 = getFeatureIso2(feature);
-        const { lat, lng } = getCountryLatLng(feature);
+    return countries.flatMap((feature) => {
+      const isoAlpha2 = getFeatureIso2(feature);
+      if (!isoAlpha2) return [];
 
-        return {
-          feature,
-          isoAlpha2,
-          name: getCountryName(feature),
-          lat,
-          lng
-        };
-      })
-      .filter(
-        (country): country is QuizCountry<CountryFeature> =>
-          !!country.isoAlpha2 && hasFlagIcon(country.isoAlpha2)
-      );
+      const { lat, lng } = getCountryLatLng(feature);
+      return [{
+        feature,
+        isoAlpha2,
+        name: getCountryName(feature),
+        lat,
+        lng
+      }];
+    });
   }, [countries]);
 
   const quizFlagPrompts = useMemo<QuizFlagPrompt<CountryFeature>[]>(
-    () => buildFlagPrompts(quizCountries),
+    () => buildFlagPrompts(quizCountries.filter((country) => hasFlagIcon(country.isoAlpha2))),
     [quizCountries]
   );
 
-  return { countries, quizCountries, quizFlagPrompts };
+  const quizKnowledgePrompts = useMemo<QuizKnowledgePrompt<CountryFeature>[]>(
+    () => buildKnowledgePrompts(quizCountries),
+    [quizCountries]
+  );
+
+  return { countries, quizCountries, quizFlagPrompts, quizKnowledgePrompts };
 }

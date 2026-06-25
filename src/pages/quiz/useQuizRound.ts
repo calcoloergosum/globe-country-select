@@ -1,14 +1,16 @@
 // Quiz round state machine hook for selection, submission, reveal, and progression.
 import { useCallback, useEffect, useState } from "react";
-import type { CountryFeature, GlobeEventData } from "../../components/InteractiveGlobe";
-import { pickNextFlagPrompt, type QuizFlagPrompt } from "../../utils/pickRandomFlagPrompt";
-import type { QuizHighlightedCountry, QuizPrompt, QuizResult, QuizSelection } from "./types";
+import type { GlobeEventData } from "../../components/InteractiveGlobe";
+import { pickNextQuizPrompt } from "../../utils/quizPrompts";
+import type { QuizPrompt, QuizResult, QuizSelection } from "./types";
 
-type UseQuizRoundResult = {
-  current: QuizPrompt | null;
+type PromptCountry<TPrompt extends QuizPrompt> = TPrompt["countries"][number];
+
+type UseQuizRoundResult<TPrompt extends QuizPrompt> = {
+  current: TPrompt | null;
   quizRound: number;
   selected: QuizSelection;
-  highlightedCountry: QuizHighlightedCountry;
+  highlightedCountry: PromptCountry<TPrompt> | null;
   result: QuizResult;
   startNextRound: () => void;
   selectCountry: (data: GlobeEventData | null) => void;
@@ -17,17 +19,22 @@ type UseQuizRoundResult = {
   showAnswer: () => void;
 };
 
-function getDefaultHighlightedCountry(current: QuizPrompt): QuizHighlightedCountry {
+function getDefaultHighlightedCountry<TPrompt extends QuizPrompt>(
+  current: TPrompt
+): PromptCountry<TPrompt> | null {
   return current.countries[0] ?? null;
 }
 
-function findPromptCountry(current: QuizPrompt, isoAlpha2: string | undefined | null) {
+function findPromptCountry<TPrompt extends QuizPrompt>(
+  current: TPrompt,
+  isoAlpha2: string | undefined | null
+): PromptCountry<TPrompt> | null {
   return current.countries.find((country) => country.isoAlpha2 === isoAlpha2) ?? null;
 }
 
-type ReconciledRoundState = {
+type ReconciledRoundState<TPrompt extends QuizPrompt> = {
   selected: QuizSelection;
-  highlightedCountry: QuizHighlightedCountry;
+  highlightedCountry: PromptCountry<TPrompt> | null;
   result: QuizResult;
   // The globe holds its own selection; clearing it requires bumping a signal.
   clearGlobeSelection: boolean;
@@ -37,13 +44,13 @@ type ReconciledRoundState = {
 // a re-parse produces fresh objects), the round should survive but any selected
 // or highlighted country that no longer exists in the new prompt must be dropped.
 // Pure so the reconciliation rules can be read and tested in isolation.
-function reconcileSameIdPrompt(
-  updatedPrompt: QuizPrompt,
+function reconcileSameIdPrompt<TPrompt extends QuizPrompt>(
+  updatedPrompt: TPrompt,
   selected: QuizSelection,
-  highlightedCountry: QuizHighlightedCountry,
+  highlightedCountry: PromptCountry<TPrompt> | null,
   result: QuizResult
-): ReconciledRoundState {
-  const next: ReconciledRoundState = {
+): ReconciledRoundState<TPrompt> {
+  const next: ReconciledRoundState<TPrompt> = {
     selected,
     highlightedCountry,
     result,
@@ -71,20 +78,20 @@ function reconcileSameIdPrompt(
   return next;
 }
 
-export function useQuizRound(
-  quizFlagPrompts: QuizFlagPrompt<CountryFeature>[]
-): UseQuizRoundResult {
-  const [current, setCurrent] = useState<QuizPrompt | null>(() =>
-    pickNextFlagPrompt(quizFlagPrompts)
+export function useQuizRound<TPrompt extends QuizPrompt>(
+  quizPrompts: TPrompt[]
+): UseQuizRoundResult<TPrompt> {
+  const [current, setCurrent] = useState<TPrompt | null>(() =>
+    pickNextQuizPrompt(quizPrompts)
   );
   const [quizRound, setQuizRound] = useState(0);
   const [selected, setSelected] = useState<QuizSelection>(null);
-  const [highlightedCountry, setHighlightedCountry] = useState<QuizHighlightedCountry>(null);
+  const [highlightedCountry, setHighlightedCountry] = useState<PromptCountry<TPrompt> | null>(null);
   const [result, setResult] = useState<QuizResult>(null);
 
   // Reconciles the active round when the prompt dataset changes (e.g. a re-parse
   // hands back equivalent prompts as fresh objects). Deliberately depends only on
-  // `quizFlagPrompts`: it reads the other state values but must not re-run when
+  // `quizPrompts`: it reads the other state values but must not re-run when
   // they change, or selecting/submitting mid-round would re-trigger
   // reconciliation. The reads are intentional, so exhaustive-deps is not applied.
   //
@@ -95,7 +102,7 @@ export function useQuizRound(
       selected !== null || highlightedCountry !== null || result !== null;
 
     // Dataset emptied: tear the round down.
-    if (quizFlagPrompts.length === 0) {
+    if (quizPrompts.length === 0) {
       if (current || hadActiveRoundState) {
         setCurrent(null);
         setSelected(null);
@@ -110,14 +117,14 @@ export function useQuizRound(
 
     // No active prompt yet: start one.
     if (!current) {
-      setCurrent(pickNextFlagPrompt(quizFlagPrompts));
+      setCurrent(pickNextQuizPrompt(quizPrompts));
       return;
     }
 
     // Current prompt is gone from the new dataset: advance to a fresh round.
-    const updatedCurrent = quizFlagPrompts.find((prompt) => prompt.id === current.id) ?? null;
+    const updatedCurrent = quizPrompts.find((prompt) => prompt.id === current.id) ?? null;
     if (!updatedCurrent) {
-      setCurrent(pickNextFlagPrompt(quizFlagPrompts, { previousPrompt: current }));
+      setCurrent(pickNextQuizPrompt(quizPrompts, { previousPrompt: current }));
       setSelected(null);
       setHighlightedCountry(null);
       setResult(null);
@@ -137,17 +144,17 @@ export function useQuizRound(
     if (reconciled.clearGlobeSelection) {
       setQuizRound((round) => round + 1);
     }
-  }, [quizFlagPrompts]);
+  }, [quizPrompts]);
 
   const startNextRound = useCallback(() => {
-    if (quizFlagPrompts.length === 0) return;
+    if (quizPrompts.length === 0) return;
 
-    setCurrent(pickNextFlagPrompt(quizFlagPrompts, { previousPrompt: current }));
+    setCurrent(pickNextQuizPrompt(quizPrompts, { previousPrompt: current }));
     setSelected(null);
     setHighlightedCountry(null);
     setResult(null);
     setQuizRound((round) => round + 1);
-  }, [current, quizFlagPrompts]);
+  }, [current, quizPrompts]);
 
   const selectCountry = useCallback(
     (data: GlobeEventData | null) => {

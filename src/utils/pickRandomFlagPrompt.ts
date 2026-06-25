@@ -1,20 +1,14 @@
-// Flag-prompt construction and random prompt selection.
+// Flag-prompt construction plus backwards-compatible flag-only random selection.
 
 import flagGroups from "./flag-groups.json";
+import {
+  pickNextQuizPrompt,
+  pickRandomQuizPrompt,
+  type QuizCountry,
+  type QuizFlagPrompt
+} from "./quizPrompts";
 
-export interface QuizCountry<TFeature = unknown> {
-  name: string;
-  isoAlpha2: string;
-  lat: number;
-  lng: number;
-  feature: TFeature;
-}
-
-export interface QuizFlagPrompt<TFeature = unknown> {
-  id: string;
-  flagCode: string;
-  countries: QuizCountry<TFeature>[];
-}
+export type { QuizCountry, QuizFlagPrompt } from "./quizPrompts";
 
 type PromptPickerOptions<TFeature> = {
   previousPrompt?: QuizFlagPrompt<TFeature> | null;
@@ -65,6 +59,7 @@ export function buildFlagPrompts<TFeature>(countries: QuizCountry<TFeature>[]): 
 
   return Array.from(byShasum.values()).map((prompt) => ({
     id: buildPromptId(prompt.flagCode, prompt.countries),
+    kind: "flag",
     ...prompt
   }));
 }
@@ -73,22 +68,12 @@ export function pickRandomFlagPrompt<TFeature>(
   prompts: QuizFlagPrompt<TFeature>[],
   rng: () => number = Math.random
 ): QuizFlagPrompt<TFeature> | null {
-  if (prompts.length === 0) return null;
-
-  const index = Math.min(Math.floor(rng() * prompts.length), prompts.length - 1);
-  return prompts[index];
+  return pickRandomQuizPrompt(prompts, rng);
 }
 
 export function pickNextFlagPrompt<TFeature>(
   prompts: QuizFlagPrompt<TFeature>[],
   { previousPrompt = null, rng = Math.random }: PromptPickerOptions<TFeature> = {}
 ): QuizFlagPrompt<TFeature> | null {
-  if (prompts.length === 0) return null;
-
-  const candidates =
-    prompts.length > 1 && previousPrompt
-      ? prompts.filter((prompt) => prompt.id !== previousPrompt.id)
-      : prompts;
-
-  return pickRandomFlagPrompt(candidates.length > 0 ? candidates : prompts, rng);
+  return pickNextQuizPrompt(prompts, { previousPrompt, rng });
 }

@@ -2,18 +2,22 @@
 
 An interactive globe for country selection and source-grounded world-knowledge questions.
 
-The current version focuses on a flag-identification quiz. Flags are used as the first complete dataset because they cover many countries, expose ambiguity such as shared flags, and exercise the core country-picking interaction.
+The app now supports both flag identification and a first source-grounded world-facts dataset. The world-facts slice demonstrates place-to-country lookup and ranked country indicators while preserving the same globe-picking interaction.
 
 The longer-term goal is to make the globe a way to experience the scale and diversity of the world through questions backed by explicit, coherent data sources.
 
 ## Current scope
 
-The app currently has two modes:
+The app currently has two top-level modes:
 
 - **Explore**: rotate the globe, hover countries, and click countries.
-- **Flag quiz**: identify a country from a displayed flag.
+- **Quiz**: answer questions from **Mixed**, **Flags**, or **World facts** question sets.
 
-The flag quiz is the first complete vertical slice, not the final product direction.
+The quiz currently includes:
+
+- rendered-flag identification, including shared-flag ambiguity
+- “In which country is Lake Biwa?” from a curated place record
+- “Which country had the 2nd largest population in 2024?” generated from a ranked World Bank indicator extract
 
 It currently exercises:
 
@@ -21,14 +25,14 @@ It currently exercises:
 - hover and click interaction
 - strict answer selection in quiz mode
 - shared-flag ambiguity, where multiple countries may be valid for the same rendered flag
+- stable prompt identity and accepted ISO alpha-2 answer sets
+- source, indicator, year, coverage, and transformation metadata for world-facts prompts
 - answer reveal and globe focus behavior
 - responsive desktop/mobile layout
 
 ## Long-term direction
 
-The larger goal is to support source-grounded world-knowledge questions.
-
-Future question types should be generated from explicit data sources rather than embedded as opaque trivia. Examples:
+The larger goal is to support a broad range of source-grounded world-knowledge questions generated from explicit data rather than embedded as opaque trivia. Examples:
 
 - “Which country has the 4th largest population in the world?”
 - “Which country has the 2nd largest wealth gap?”
@@ -38,25 +42,29 @@ The precise meaning of a question should come from its source and metadata. For 
 
 ## Data philosophy
 
-Questions should be traceable.
-
-A future question should carry enough metadata to explain itself:
+Questions should be traceable. A world-facts prompt carries enough metadata to explain itself:
 
 - source name
 - source URL or citation
 - indicator or event category
 - year or date range
 - transformation rule, such as ranking, filtering, or grouping
+- coverage note
 - accepted country answers
 
-Example future source families:
+Current source families:
 
-- World Bank indicators
+- Lake Biwa Museum place facts
+- World Bank indicator `SP.POP.TOTL` (`Population, total`)
+
+Future source families may include:
+
+- additional World Bank indicators
 - United Nations datasets
 - curated historical event datasets
 - other coherent country-level reference datasets
 
-This repository does not yet implement that data layer. The current flag quiz is the first interaction-complete feature.
+The seed definitions live in `src/data/knowledgeQuestions.ts`. `src/utils/buildKnowledgePrompts.ts` resolves their ISO country answers against the globe data and performs ranking transformations. The population question is fixed to the 2024 observation year; its bundled extract contains the five highest country values needed to reproduce the implemented rank.
 
 ## Picking behavior
 
